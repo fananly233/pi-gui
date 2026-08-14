@@ -17,6 +17,21 @@ export type PiAdapterEvent =
 	| { type: "rpc_protocol_error"; line: string }
 	| { type: "rpc_stderr"; line: string };
 
+export type PiSessionState = Readonly<{
+	isStreaming: boolean;
+	isCompacting: boolean;
+	sessionFile?: string;
+	sessionId: string;
+	sessionName?: string;
+	messageCount: number;
+	pendingMessageCount: number;
+}>;
+
+export type PiForkOption = Readonly<{
+	entryId: string;
+	text: string;
+}>;
+
 type RpcLinePayload = {
 	instance_id?: string;
 	instanceId?: string;
@@ -78,6 +93,10 @@ export class PiAdapter {
 
 	constructor(instanceId = "core-chat") {
 		this.instanceId = instanceId;
+	}
+
+	get id(): string {
+		return this.instanceId;
 	}
 
 	get isConnected(): boolean {
@@ -147,6 +166,44 @@ export class PiAdapter {
 		return this.request({ type: "abort" });
 	}
 
+	newSession(parentSession?: string): Promise<{ cancelled: boolean }> {
+		return this.request({ type: "new_session", ...(parentSession ? { parentSession } : {}) });
+	}
+
+	getState(): Promise<PiSessionState> {
+		return this.request({ type: "get_state" });
+	}
+
+	getMessages(): Promise<JsonObject[]> {
+		return this.request<{ messages: JsonObject[] }>({ type: "get_messages" }).then((data) => data.messages);
+	}
+
+	switchSession(sessionPath: string): Promise<{ cancelled: boolean }> {
+		return this.request({ type: "switch_session", sessionPath });
+	}
+
+	setSessionName(name: string): Promise<void> {
+		return this.request({ type: "set_session_name", name });
+	}
+
+	getForkMessages(): Promise<PiForkOption[]> {
+		return this.request<{ messages: PiForkOption[] }>({ type: "get_fork_messages" }).then((data) => data.messages);
+	}
+
+	fork(entryId: string): Promise<{ text: string; cancelled: boolean }> {
+		return this.request({ type: "fork", entryId });
+	}
+
+	async dispose(): Promise<void> {
+		try {
+			if (this.connected) await this.stop();
+		} finally {
+			for (const unlisten of this.unlisteners.splice(0)) unlisten();
+			this.subscribers.clear();
+			this.listenersPromise = null;
+		}
+	}
+
 	private emit(event: PiAdapterEvent): void {
 		for (const subscriber of this.subscribers) subscriber(event);
 	}
@@ -213,7 +270,7 @@ export class PiAdapter {
 		this.emit({ type: "rpc_event", event });
 	}
 
-	private async request(command: JsonObject): Promise<void> {
+	private async request<T = void>(command: JsonObject): Promise<T> {
 		if (!this.connected) throw new Error("Connect Pi before sending a command.");
 		await this.ensureListeners();
 		const id = `gui-${++this.requestSequence}`;
@@ -234,6 +291,7 @@ export class PiAdapter {
 		});
 
 		if (response.success === false) throw new Error(describeRpcError(response));
+		return response.data as T;
 	}
 
 	private rejectPending(reason: string): void {

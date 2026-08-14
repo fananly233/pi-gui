@@ -20,7 +20,7 @@
 		"build": "tauri build",
 		"preview": "vite preview",
 		"check": "tsc --noEmit",
-		"test": "node --experimental-strip-types --test tests/event-normalizer.test.mjs",
+		"test": "node --experimental-strip-types --test tests/*.test.mjs",
 		"gate:pi-real": "node --experimental-strip-types scripts/real-pi-rpc-gate.mjs"
 	},
 	"dependencies": {

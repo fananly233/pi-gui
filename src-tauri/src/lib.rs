@@ -1054,6 +1054,37 @@ async fn list_sessions(app: AppHandle) -> Result<Vec<SessionInfo>, String> {
     Ok(sessions)
 }
 
+/// Delete one persisted Pi session without exposing a general-purpose file delete command.
+#[tauri::command]
+async fn delete_session(app: AppHandle, session_path: String) -> Result<bool, String> {
+    let sessions_dir = get_pi_sessions_dir(&app)?;
+    if !sessions_dir.exists() {
+        return Ok(false);
+    }
+
+    let requested = PathBuf::from(session_path.trim());
+    if requested.as_os_str().is_empty() || !requested.exists() {
+        return Ok(false);
+    }
+
+    let sessions_root = fs::canonicalize(&sessions_dir)
+        .map_err(|e| format!("Failed to resolve sessions directory: {}", e))?;
+    let target = fs::canonicalize(&requested)
+        .map_err(|e| format!("Failed to resolve session path: {}", e))?;
+    let is_jsonl = target
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| ext.eq_ignore_ascii_case("jsonl"))
+        .unwrap_or(false);
+
+    if !target.starts_with(&sessions_root) || !target.is_file() || !is_jsonl {
+        return Err("Refusing to delete a file outside the Pi sessions directory".to_string());
+    }
+
+    fs::remove_file(&target).map_err(|e| format!("Failed to delete session: {}", e))?;
+    Ok(true)
+}
+
 /// Get the content of a session file
 #[tauri::command]
 async fn get_session_content(session_path: String) -> Result<String, String> {
@@ -2434,6 +2465,7 @@ pub fn run() {
             rpc_is_running,
             rpc_ui_response,
             list_sessions,
+            delete_session,
             get_session_content,
             get_pi_auth_status,
             get_pi_oauth_providers,
