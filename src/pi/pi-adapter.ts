@@ -1,0 +1,270 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { JsonObject } from "./event-normalizer";
+
+export type StreamingBehavior = "steer" | "followUp";
+
+export type PiStartOptions = Readonly<{
+	cwd: string;
+	provider?: string;
+	model?: string;
+	piPath?: string;
+}>;
+
+export type PiAdapterEvent =
+	| { type: "rpc_event"; event: JsonObject }
+	| { type: "rpc_disconnected"; reason: string }
+	| { type: "rpc_protocol_error"; line: string }
+	| { type: "rpc_stderr"; line: string };
+
+type RpcLinePayload = {
+	instance_id?: string;
+	instanceId?: string;
+	generation?: number;
+	line?: string;
+};
+
+type RpcClosedPayload = {
+	instance_id?: string;
+	instanceId?: string;
+	generation?: number;
+	reason?: string;
+};
+
+type RpcStartResult = {
+	discovery: string;
+	generation: number;
+};
+
+type PendingRequest = {
+	resolve: (response: JsonObject) => void;
+	reject: (error: Error) => void;
+	timeout: ReturnType<typeof setTimeout>;
+};
+
+type BufferedEnvelope =
+	| { kind: "line"; payload: RpcLinePayload }
+	| { kind: "closed"; payload: RpcClosedPayload }
+	| { kind: "stderr"; payload: RpcLinePayload };
+
+function payloadInstanceId(payload: RpcLinePayload | RpcClosedPayload): string {
+	return (payload.instance_id ?? payload.instanceId ?? "default").trim() || "default";
+}
+
+function payloadGeneration(payload: RpcLinePayload | RpcClosedPayload): number | null {
+	return typeof payload.generation === "number" && Number.isFinite(payload.generation) ? payload.generation : null;
+}
+
+function describeRpcError(response: JsonObject): string {
+	if (typeof response.error === "string") return response.error;
+	if (response.error && typeof response.error === "object" && "message" in response.error) {
+		const message = (response.error as { message?: unknown }).message;
+		if (typeof message === "string") return message;
+	}
+	return `Pi rejected ${String(response.command ?? "the command")}.`;
+}
+
+export class PiAdapter {
+	private readonly instanceId: string;
+	private requestSequence = 0;
+	private currentGeneration: number | null = null;
+	private connected = false;
+	private starting = false;
+	private buffered: BufferedEnvelope[] = [];
+	private subscribers = new Set<(event: PiAdapterEvent) => void>();
+	private pending = new Map<string, PendingRequest>();
+	private listenersPromise: Promise<void> | null = null;
+	private unlisteners: UnlistenFn[] = [];
+
+	constructor(instanceId = "core-chat") {
+		this.instanceId = instanceId;
+	}
+
+	get isConnected(): boolean {
+		return this.connected;
+	}
+
+	onEvent(subscriber: (event: PiAdapterEvent) => void): () => void {
+		this.subscribers.add(subscriber);
+		return () => this.subscribers.delete(subscriber);
+	}
+
+	async start(options: PiStartOptions): Promise<RpcStartResult> {
+		if (this.starting) throw new Error("Pi RPC is already starting.");
+		await this.ensureListeners();
+		this.starting = true;
+		this.buffered = [];
+
+		try {
+			const result = await invoke<RpcStartResult>("rpc_start", {
+				options: {
+					cli_path: null,
+					pi_path: options.piPath?.trim() || null,
+					cwd: options.cwd,
+					provider: options.provider?.trim() || null,
+					model: options.model?.trim() || null,
+					env: null,
+				},
+				instanceId: this.instanceId,
+			});
+
+			this.currentGeneration = result.generation;
+			this.connected = true;
+			this.starting = false;
+			const buffered = this.buffered;
+			this.buffered = [];
+			for (const envelope of buffered) this.processEnvelope(envelope);
+			if (!this.connected) throw new Error("Pi RPC exited during startup.");
+			return result;
+		} catch (error) {
+			this.starting = false;
+			this.buffered = [];
+			this.connected = false;
+			throw error;
+		}
+	}
+
+	async stop(): Promise<void> {
+		this.connected = false;
+		this.rejectPending("Pi RPC stopped.");
+		await invoke("rpc_stop", { instanceId: this.instanceId });
+		this.currentGeneration = null;
+	}
+
+	prompt(message: string): Promise<void> {
+		return this.request({ type: "prompt", message });
+	}
+
+	steer(message: string): Promise<void> {
+		return this.request({ type: "steer", message });
+	}
+
+	followUp(message: string): Promise<void> {
+		return this.request({ type: "follow_up", message });
+	}
+
+	abort(): Promise<void> {
+		return this.request({ type: "abort" });
+	}
+
+	private emit(event: PiAdapterEvent): void {
+		for (const subscriber of this.subscribers) subscriber(event);
+	}
+
+	private matchesActiveProcess(payload: RpcLinePayload | RpcClosedPayload): boolean {
+		if (payloadInstanceId(payload) !== this.instanceId) return false;
+		const generation = payloadGeneration(payload);
+		return generation === null || this.currentGeneration === null || generation === this.currentGeneration;
+	}
+
+	private receive(envelope: BufferedEnvelope): void {
+		if (payloadInstanceId(envelope.payload) !== this.instanceId) return;
+		if (this.starting) {
+			this.buffered.push(envelope);
+			return;
+		}
+		this.processEnvelope(envelope);
+	}
+
+	private processEnvelope(envelope: BufferedEnvelope): void {
+		if (!this.connected) return;
+		if (!this.matchesActiveProcess(envelope.payload)) return;
+		if (envelope.kind === "closed") {
+			this.connected = false;
+			const reason = envelope.payload.reason?.trim() || "Pi RPC process closed.";
+			this.rejectPending(reason);
+			this.emit({ type: "rpc_disconnected", reason });
+			return;
+		}
+
+		const line = envelope.payload.line;
+		if (!line) return;
+		if (envelope.kind === "stderr") {
+			console.debug(`[pi stderr:${this.instanceId}]`, line);
+			this.emit({ type: "rpc_stderr", line });
+			return;
+		}
+		this.handleLine(line);
+	}
+
+	private handleLine(line: string): void {
+		let parsed: unknown;
+		try {
+			parsed = JSON.parse(line);
+		} catch {
+			this.emit({ type: "rpc_protocol_error", line });
+			return;
+		}
+
+		if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+			this.emit({ type: "rpc_protocol_error", line });
+			return;
+		}
+		const event = parsed as JsonObject;
+		if (event.type === "response" && typeof event.id === "string") {
+			const request = this.pending.get(event.id);
+			if (request) {
+				clearTimeout(request.timeout);
+				this.pending.delete(event.id);
+				request.resolve(event);
+				return;
+			}
+		}
+		this.emit({ type: "rpc_event", event });
+	}
+
+	private async request(command: JsonObject): Promise<void> {
+		if (!this.connected) throw new Error("Connect Pi before sending a command.");
+		await this.ensureListeners();
+		const id = `gui-${++this.requestSequence}`;
+		const line = JSON.stringify({ ...command, id });
+		if (line.includes("\n") || line.includes("\r")) throw new Error("RPC command must be one LF-delimited JSON record.");
+
+		const response = await new Promise<JsonObject>((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				this.pending.delete(id);
+				reject(new Error(`Timed out waiting for Pi to accept ${String(command.type)}.`));
+			}, 35_000);
+			this.pending.set(id, { resolve, reject, timeout });
+			invoke("rpc_send", { command: line, instanceId: this.instanceId }).catch((error) => {
+				clearTimeout(timeout);
+				this.pending.delete(id);
+				reject(new Error(`Failed to write Pi RPC command: ${String(error)}`));
+			});
+		});
+
+		if (response.success === false) throw new Error(describeRpcError(response));
+	}
+
+	private rejectPending(reason: string): void {
+		for (const request of this.pending.values()) {
+			clearTimeout(request.timeout);
+			request.reject(new Error(reason));
+		}
+		this.pending.clear();
+	}
+
+	private async ensureListeners(): Promise<void> {
+		if (this.unlisteners.length > 0) return;
+		if (this.listenersPromise) return this.listenersPromise;
+
+		this.listenersPromise = (async () => {
+			const unlisteners: UnlistenFn[] = [];
+			try {
+				unlisteners.push(await listen<RpcLinePayload>("rpc-event", (event) => this.receive({ kind: "line", payload: event.payload })));
+				unlisteners.push(await listen<RpcClosedPayload>("rpc-closed", (event) => this.receive({ kind: "closed", payload: event.payload })));
+				unlisteners.push(await listen<RpcLinePayload>("rpc-stderr", (event) => this.receive({ kind: "stderr", payload: event.payload })));
+				this.unlisteners = unlisteners;
+			} catch (error) {
+				for (const unlisten of unlisteners) unlisten();
+				throw error;
+			} finally {
+				this.listenersPromise = null;
+			}
+		})();
+
+		return this.listenersPromise;
+	}
+}
+
+export const piAdapter = new PiAdapter();

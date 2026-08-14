@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { DesktopRuntimeInfo } from "../api/desktop-api";
+import type { PiChatController } from "../hooks/usePiChat";
 import { applyTheme, readStoredTheme, storeTheme, type Theme } from "../theme";
+import { ChatWindow } from "./ChatWindow";
 import { TitleBar } from "./TitleBar";
 
 export type RuntimeState =
@@ -11,52 +13,30 @@ export type RuntimeState =
 type AppShellProps = {
 	runtimeState: RuntimeState;
 	onRetryRuntime: () => Promise<void>;
+	workspacePath: string;
+	onWorkspacePathChange: (path: string) => void;
+	onConnect: () => Promise<void>;
+	chat: PiChatController;
 };
 
 function RuntimePanel({ state, onRetry }: { state: RuntimeState; onRetry: () => Promise<void> }) {
-	if (state.status === "loading") {
-		return (
-			<div className="runtime-state" role="status">
-				<span className="spinner" aria-hidden="true" />
-				<span>Checking the Rust bridge…</span>
-			</div>
-		);
-	}
-
+	if (state.status === "loading") return <span>Checking Rust bridge…</span>;
 	if (state.status === "error") {
 		return (
-			<div className="runtime-state runtime-state--error" role="alert">
-				<div>
-					<strong>Native bridge unavailable</strong>
-					<p>{state.message}</p>
-				</div>
-				<button type="button" className="button button--secondary" onClick={() => void onRetry()}>
-					Retry
-				</button>
-			</div>
+			<>
+				<span title={state.message}>Bridge unavailable</span>
+				<button type="button" onClick={() => void onRetry()}>Retry</button>
+			</>
 		);
 	}
-
-	return (
-		<div className="runtime-grid" aria-label="Desktop runtime information">
-			<RuntimeValue label="Platform" value={state.info.platform} />
-			<RuntimeValue label="Architecture" value={state.info.arch} />
-			<RuntimeValue label="App version" value={`v${state.info.version}`} />
-		</div>
-	);
+	return <span title={`${state.info.platform} / ${state.info.arch}`}>Tauri v{state.info.version}</span>;
 }
 
-function RuntimeValue({ label, value }: { label: string; value: string }) {
-	return (
-		<div className="runtime-value">
-			<span>{label}</span>
-			<strong>{value}</strong>
-		</div>
-	);
-}
-
-export function AppShell({ runtimeState, onRetryRuntime }: AppShellProps) {
+export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorkspacePathChange, onConnect, chat }: AppShellProps) {
 	const [theme, setTheme] = useState<Theme>(() => readStoredTheme());
+	const connectionBusy = chat.connection.status === "connecting";
+	const connected = chat.connection.status === "connected";
+	const connectionTone = connected ? "ready" : connectionBusy ? "loading" : chat.connection.status === "error" ? "error" : "muted";
 
 	const toggleTheme = () => {
 		const nextTheme: Theme = theme === "dark" ? "light" : "dark";
@@ -73,63 +53,84 @@ export function AppShell({ runtimeState, onRetryRuntime }: AppShellProps) {
 				<aside className="sidebar" aria-label="Workspace sidebar">
 					<div className="sidebar__header">
 						<p className="eyebrow">Workspace</p>
-						<h1>Local projects</h1>
+						<h1>Local Pi</h1>
 					</div>
 
-					<button type="button" className="new-session" disabled>
-						<span aria-hidden="true">＋</span>
-						<span>New session</span>
-						<small>Phase 3</small>
-					</button>
+					<section className="connection-card" aria-label="Pi connection">
+						<div className="connection-card__heading">
+							<span className={`status-dot status-dot--${connectionTone}`} aria-hidden="true" />
+							<div>
+								<strong>{connected ? "Pi connected" : connectionBusy ? "Starting Pi" : "Pi runtime"}</strong>
+								<span>{connected ? (chat.activity === "idle" ? "Ready" : "Agent running") : "System CLI · configured model"}</span>
+							</div>
+						</div>
+
+						<label htmlFor="workspace-path">Working directory</label>
+						<input
+							id="workspace-path"
+							data-testid="workspace-path"
+							type="text"
+							value={workspacePath}
+							onChange={(event) => onWorkspacePathChange(event.target.value)}
+							disabled={connectionBusy || connected}
+							spellCheck={false}
+						/>
+
+						{connected ? (
+							<button type="button" className="button button--secondary connection-button" onClick={() => void chat.disconnect()}>
+								Disconnect
+							</button>
+						) : (
+							<button
+								type="button"
+								className="button button--primary connection-button"
+								onClick={() => void onConnect()}
+								disabled={connectionBusy || runtimeState.status !== "ready" || !workspacePath.trim()}
+								data-testid="connect-button"
+							>
+								{connectionBusy ? "Connecting…" : chat.connection.status === "error" ? "Retry connection" : "Connect Pi"}
+							</button>
+						)}
+
+						{chat.connection.status === "error" ? <p className="connection-card__error">{chat.connection.message}</p> : null}
+						{chat.connection.status === "connected" ? (
+							<p className="connection-card__discovery" title={chat.connection.discovery}>{chat.connection.discovery}</p>
+						) : null}
+					</section>
 
 					<nav className="sidebar__nav" aria-label="Shell destinations">
 						<button type="button" className="nav-item nav-item--active" aria-current="page">
 							<span className="nav-icon" aria-hidden="true">◫</span>
-							<span>Overview</span>
+							<span>Core chat</span>
+							<small>Phase 2</small>
 						</button>
 						<button type="button" className="nav-item" disabled>
 							<span className="nav-icon" aria-hidden="true">◎</span>
 							<span>Sessions</span>
+							<small>Phase 3</small>
 						</button>
 					</nav>
 
 					<div className="sidebar__spacer" />
-					<div className="sidebar__status">
+					<div className={`sidebar__runtime sidebar__runtime--${runtimeState.status}`}>
 						<span className={`status-dot status-dot--${runtimeState.status}`} aria-hidden="true" />
-						<div>
-							<strong>Tauri runtime</strong>
-							<span>{runtimeState.status === "ready" ? "Connected" : runtimeState.status === "error" ? "Needs attention" : "Checking"}</span>
-						</div>
+						<RuntimePanel state={runtimeState} onRetry={onRetryRuntime} />
 					</div>
 				</aside>
 
-				<main className="workspace">
-					<div className="workspace__content">
-						<p className="eyebrow eyebrow--accent">Migration foundation</p>
-						<h2>React is ready. Pi stays native.</h2>
-						<p className="workspace__intro">
-							This first shell proves the renderer and Gustav’s Rust bridge share one desktop lifecycle. Chat and agent streaming intentionally begin in Phase 2.
-						</p>
-
-						<section className="bridge-card" aria-labelledby="bridge-card-title">
-							<div className="bridge-card__heading">
-								<div>
-									<span className="bridge-card__kicker">Native bridge</span>
-									<h3 id="bridge-card-title">Desktop runtime</h3>
-								</div>
-								<span className="foundation-chip">Phase 1</span>
-							</div>
-							<RuntimePanel state={runtimeState} onRetry={onRetryRuntime} />
-						</section>
-
-						<div className="next-step">
-							<span className="next-step__number">02</span>
-							<div>
-								<strong>Next: real Pi conversation transport</strong>
-								<p>RPC streaming, tool events, abort, and second-prompt reliability remain outside this shell.</p>
-							</div>
-						</div>
-					</div>
+				<main className="workspace workspace--chat">
+					<ChatWindow
+						connection={chat.connection}
+						activity={chat.activity}
+						messages={chat.messages}
+						queue={chat.queue}
+						sending={chat.sending}
+						aborting={chat.aborting}
+						lastError={chat.lastError}
+						send={chat.send}
+						abort={chat.abort}
+						clearError={chat.clearError}
+					/>
 				</main>
 			</div>
 		</div>
