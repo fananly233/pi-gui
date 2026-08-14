@@ -29,6 +29,38 @@ type NativeSessionInfo = Readonly<{
 	cost: number;
 }>;
 
+export type PiAuthProviderStatus = Readonly<{
+	provider: string;
+	source: "auth_file_oauth" | "auth_file_api_key" | "environment" | string;
+	kind: string;
+}>;
+
+export type PiAuthStatus = Readonly<{
+	agentDir: string | null;
+	authFile: string | null;
+	authFileExists: boolean;
+	configuredProviders: PiAuthProviderStatus[];
+}>;
+
+type NativePiAuthStatus = Readonly<{
+	agent_dir: string | null;
+	auth_file: string | null;
+	auth_file_exists: boolean;
+	configured_providers: PiAuthProviderStatus[];
+}>;
+
+export type PiOAuthProviderInfo = Readonly<{
+	id: string;
+	name: string;
+	source: string;
+}>;
+
+export type PiProviderAuthClearResult = Readonly<{
+	provider: string;
+	removed: boolean;
+	source: string;
+}>;
+
 export const desktopApi = {
 	getRuntimeInfo(): Promise<DesktopRuntimeInfo> {
 		return invoke<DesktopRuntimeInfo>("get_desktop_runtime_info");
@@ -50,6 +82,24 @@ export const desktopApi = {
 
 	deleteSession(sessionPath: string): Promise<boolean> {
 		return invoke<boolean>("delete_session", { sessionPath });
+	},
+
+	async getPiAuthStatus(): Promise<PiAuthStatus> {
+		const status = await invoke<NativePiAuthStatus>("get_pi_auth_status");
+		return {
+			agentDir: status.agent_dir,
+			authFile: status.auth_file,
+			authFileExists: status.auth_file_exists,
+			configuredProviders: status.configured_providers,
+		};
+	},
+
+	getPiOAuthProviders(): Promise<PiOAuthProviderInfo[]> {
+		return invoke<PiOAuthProviderInfo[]>("get_pi_oauth_providers");
+	},
+
+	clearPiProviderAuth(provider: string): Promise<PiProviderAuthClearResult> {
+		return invoke<PiProviderAuthClearResult>("clear_pi_provider_auth", { provider });
 	},
 
 	minimize(): Promise<void> {

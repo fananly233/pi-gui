@@ -1173,6 +1173,74 @@ fn provider_env_var_is_set(provider: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn normalize_auth_provider(provider: &str) -> Result<String, String> {
+    let normalized = provider.trim().to_lowercase();
+    if normalized.is_empty() {
+        return Err("Provider cannot be empty".to_string());
+    }
+    if !normalized
+        .chars()
+        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || matches!(ch, '.' | '_' | '-'))
+    {
+        return Err("Provider contains unsupported characters".to_string());
+    }
+    Ok(normalized)
+}
+
+fn read_auth_object(path: &Path) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    let content = fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read auth file '{}': {}", path.display(), e))?;
+    let parsed = serde_json::from_str::<serde_json::Value>(&content)
+        .map_err(|e| format!("Invalid JSON in auth file '{}': {}", path.display(), e))?;
+    parsed
+        .as_object()
+        .cloned()
+        .ok_or_else(|| format!("Auth file '{}' must contain a JSON object", path.display()))
+}
+
+fn auth_provider_statuses_from_file(path: &Path) -> Result<Vec<PiAuthProviderStatus>, String> {
+    let entries = read_auth_object(path)?;
+    Ok(entries
+        .iter()
+        .map(|(provider, credential)| {
+            let kind = credential
+                .get("type")
+                .and_then(|value| value.as_str())
+                .unwrap_or("unknown")
+                .to_string();
+            PiAuthProviderStatus {
+                provider: provider.clone(),
+                source: if kind == "oauth" {
+                    "auth_file_oauth".to_string()
+                } else {
+                    "auth_file_api_key".to_string()
+                },
+                kind,
+            }
+        })
+        .collect())
+}
+
+fn clear_provider_auth_file(path: &Path, provider: &str) -> Result<bool, String> {
+    let mut entries = read_auth_object(path)?;
+    if entries.remove(provider).is_none() {
+        return Ok(false);
+    }
+
+    let serialized = serde_json::to_string_pretty(&serde_json::Value::Object(entries))
+        .map_err(|e| format!("Failed to serialize auth file: {}", e))?;
+    fs::write(path, format!("{}\n", serialized))
+        .map_err(|e| format!("Failed to write auth file '{}': {}", path.display(), e))?;
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
+    }
+
+    Ok(true)
+}
+
 /// Inspect PI auth configuration from auth.json + environment variables.
 #[tauri::command]
 async fn get_pi_auth_status() -> Result<PiAuthStatus, String> {
@@ -1187,32 +1255,7 @@ async fn get_pi_auth_status() -> Result<PiAuthStatus, String> {
 
     if let Some(path) = &auth_file_path {
         if path.exists() && path.is_file() {
-            if let Ok(content) = fs::read_to_string(path) {
-                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&content) {
-                    if let Some(map) = parsed.as_object() {
-                        for (provider, cred) in map {
-                            let kind = cred
-                                .get("type")
-                                .and_then(|v| v.as_str())
-                                .unwrap_or("unknown")
-                                .to_string();
-
-                            let source = if kind == "oauth" {
-                                "auth_file_oauth"
-                            } else {
-                                "auth_file_api_key"
-                            }
-                            .to_string();
-
-                            configured_providers.push(PiAuthProviderStatus {
-                                provider: provider.clone(),
-                                source,
-                                kind,
-                            });
-                        }
-                    }
-                }
-            }
+            configured_providers.extend(auth_provider_statuses_from_file(path)?);
         }
     }
 
@@ -1257,10 +1300,7 @@ struct PiProviderAuthClearResult {
 /// Remove provider credentials from ~/.pi/agent/auth.json when present.
 #[tauri::command]
 async fn clear_pi_provider_auth(provider: String) -> Result<PiProviderAuthClearResult, String> {
-    let normalized = provider.trim().to_lowercase();
-    if normalized.is_empty() {
-        return Err("Provider cannot be empty".to_string());
-    }
+    let normalized = normalize_auth_provider(&provider)?;
 
     let agent_dir = get_pi_agent_dir();
     let auth_file_path = agent_dir.as_ref().map(|dir| dir.join("auth.json"));
@@ -1268,30 +1308,7 @@ async fn clear_pi_provider_auth(provider: String) -> Result<PiProviderAuthClearR
 
     if let Some(path) = &auth_file_path {
         if path.exists() && path.is_file() {
-            let content = fs::read_to_string(path)
-                .map_err(|e| format!("Failed to read auth file: {}", e))?;
-            let mut parsed = serde_json::from_str::<serde_json::Value>(&content)
-                .unwrap_or_else(|_| serde_json::json!({}));
-
-            if !parsed.is_object() {
-                parsed = serde_json::json!({});
-            }
-
-            if let Some(map) = parsed.as_object_mut() {
-                if map.remove(&normalized).is_some() {
-                    removed = true;
-                    let serialized = serde_json::to_string_pretty(&parsed)
-                        .map_err(|e| format!("Failed to serialize auth file: {}", e))?;
-                    fs::write(path, format!("{}\n", serialized))
-                        .map_err(|e| format!("Failed to write auth file: {}", e))?;
-
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::fs::PermissionsExt;
-                        let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o600));
-                    }
-                }
-            }
+            removed = clear_provider_auth_file(path, &normalized)?;
         }
     }
 
@@ -2529,7 +2546,10 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{delete_session_file, read_session_file};
+    use super::{
+        auth_provider_statuses_from_file, clear_provider_auth_file, delete_session_file,
+        normalize_auth_provider, read_session_file,
+    };
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -2585,5 +2605,72 @@ mod tests {
         );
         assert!(read_session_file(&sessions, &outside).is_err());
         fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn auth_status_serializes_metadata_without_credential_values() {
+        let root = test_root();
+        fs::create_dir_all(&root).expect("create auth test directory");
+        let auth_file = root.join("auth.json");
+        fs::write(
+            &auth_file,
+            r#"{"openai-codex":{"type":"oauth","access":"must-not-leak"},"deepseek":{"type":"api_key","key":"must-not-leak"}}"#,
+        )
+        .expect("write auth file");
+
+        let statuses = auth_provider_statuses_from_file(&auth_file).expect("read auth metadata");
+        let serialized = serde_json::to_string(&statuses).expect("serialize auth metadata");
+        assert!(serialized.contains("openai-codex"));
+        assert!(serialized.contains("auth_file_oauth"));
+        assert!(!serialized.contains("must-not-leak"));
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn clears_only_the_requested_provider_from_an_isolated_auth_file() {
+        let root = test_root();
+        fs::create_dir_all(&root).expect("create auth test directory");
+        let auth_file = root.join("auth.json");
+        fs::write(
+            &auth_file,
+            r#"{"deepseek":{"type":"api_key","key":"one"},"openai-codex":{"type":"oauth","access":"two"}}"#,
+        )
+        .expect("write auth file");
+
+        assert!(clear_provider_auth_file(&auth_file, "deepseek").expect("clear provider"));
+        let remaining: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&auth_file).expect("read updated auth file"))
+                .expect("parse updated auth file");
+        assert!(remaining.get("deepseek").is_none());
+        assert_eq!(remaining["openai-codex"]["access"], "two");
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn malformed_auth_is_rejected_without_overwriting_the_file() {
+        let root = test_root();
+        fs::create_dir_all(&root).expect("create auth test directory");
+        let auth_file = root.join("auth.json");
+        let malformed = "{not-json\n";
+        fs::write(&auth_file, malformed).expect("write malformed auth file");
+
+        let error = clear_provider_auth_file(&auth_file, "deepseek")
+            .expect_err("malformed auth must be rejected");
+        assert!(error.contains("Invalid JSON"));
+        assert_eq!(
+            fs::read_to_string(&auth_file).expect("read preserved auth file"),
+            malformed
+        );
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn rejects_unsupported_provider_characters() {
+        assert_eq!(
+            normalize_auth_provider(" OpenAI-Codex ").expect("valid provider"),
+            "openai-codex"
+        );
+        assert!(normalize_auth_provider("../openai").is_err());
+        assert!(normalize_auth_provider("provider/name").is_err());
     }
 }
