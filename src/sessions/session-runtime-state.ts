@@ -1,4 +1,5 @@
 import type { ChatActivity, ChatMessage } from "../chat/chat-types";
+import type { PiModelInfo, PiThinkingLevel } from "../models/model-state";
 
 export type SessionRuntimePhase = "starting" | "switching" | "ready" | "failed";
 
@@ -15,10 +16,13 @@ export type SessionRuntimeSnapshot = Readonly<{
 	discovery: string;
 	phase: SessionRuntimePhase;
 	activity: ChatActivity;
+	model: PiModelInfo | null;
+	thinkingLevel: PiThinkingLevel;
 	messages: ChatMessage[];
 	queue: { steering: string[]; followUp: string[] };
 	sending: boolean;
 	aborting: boolean;
+	configuringModel: boolean;
 	lastError: string | null;
 }>;
 

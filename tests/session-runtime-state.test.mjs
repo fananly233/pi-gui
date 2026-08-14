@@ -20,10 +20,13 @@ function snapshot(key, message) {
 		discovery: "test",
 		phase: "ready",
 		activity: "idle",
+		model: null,
+		thinkingLevel: "off",
 		messages: message ? [message] : [],
 		queue: { steering: [], followUp: [] },
 		sending: false,
 		aborting: false,
+		configuringModel: false,
 		lastError: null,
 	};
 }
@@ -55,6 +58,19 @@ test("runtime updates stay isolated to their owning session", () => {
 	assert.equal(next.get("a").lastError, "A only");
 	assert.strictEqual(next.get("b"), runtimeB);
 	assert.deepEqual(next.get("b").messages, [messageB]);
+});
+
+test("model configuration stays isolated to its owning session", () => {
+	const runtimeA = snapshot("a");
+	const runtimeB = snapshot("b");
+	const model = { provider: "deepseek", id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", reasoning: true, input: ["text"], contextWindow: 128000, maxTokens: 8192 };
+	const runtimes = new Map([["a", runtimeA], ["b", runtimeB]]);
+
+	const next = updateRuntimeSnapshot(runtimes, "a", (current) => ({ ...current, model, thinkingLevel: "high" }));
+	assert.deepEqual(next.get("a").model, model);
+	assert.equal(next.get("a").thinkingLevel, "high");
+	assert.equal(next.get("b").model, null);
+	assert.equal(next.get("b").thinkingLevel, "off");
 });
 
 test("treats starting and switching runtimes as unsafe for file mutation", () => {

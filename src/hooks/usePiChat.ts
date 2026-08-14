@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { desktopApi, type DesktopSessionInfo } from "../api/desktop-api";
 import type { ChatActivity, ChatDelivery, ChatMessage, PiConnectionState } from "../chat/chat-types";
 import { EventNormalizer, type NormalizedPiEvent } from "../pi/event-normalizer";
+import type { PiModelConfiguration, PiModelInfo, PiThinkingLevel } from "../models/model-state";
 import { PiAdapter, type PiAdapterEvent, type PiForkOption } from "../pi/pi-adapter";
 import { parseSessionMessages } from "../sessions/session-message-parser";
 import {
@@ -51,13 +52,16 @@ function createSnapshot(key: string, cwd: string, phase: SessionRuntimeSnapshot[
 		sessionId: null,
 		sessionName: null,
 		discovery: "",
-		phase,
-		activity: "idle",
-		messages: [],
+	phase,
+	activity: "idle",
+	model: null,
+	thinkingLevel: "off",
+	messages: [],
 		queue: { steering: [], followUp: [] },
-		sending: false,
-		aborting: false,
-		lastError: null,
+	sending: false,
+	aborting: false,
+	configuringModel: false,
+	lastError: null,
 	};
 }
 
@@ -237,6 +241,8 @@ export function usePiChat() {
 					sessionId: state.sessionId || snapshot.sessionId,
 					sessionName: state.sessionName ?? snapshot.sessionName,
 					activity: state.isStreaming ? "running" : snapshot.activity,
+					model: state.model,
+					thinkingLevel: state.thinkingLevel,
 				}));
 				await refreshSessions();
 			} catch (error) {
@@ -350,6 +356,8 @@ export function usePiChat() {
 						sessionId: state.sessionId || session.id,
 						sessionName: state.sessionName ?? session.name,
 						activity: state.isStreaming ? "running" : "idle",
+						model: state.model,
+						thinkingLevel: state.thinkingLevel,
 						messages: parseSessionMessages(rawMessages),
 						lastError: null,
 					}));
@@ -474,6 +482,8 @@ export function usePiChat() {
 				sessionPath: state.sessionFile ?? null,
 				sessionId: state.sessionId || null,
 				sessionName: state.sessionName ?? null,
+				model: state.model,
+				thinkingLevel: state.thinkingLevel,
 				messages: parseSessionMessages(rawMessages),
 				lastError: null,
 			}));
@@ -586,6 +596,8 @@ export function usePiChat() {
 					sessionPath: state.sessionFile ?? null,
 					sessionId: state.sessionId || null,
 					sessionName: state.sessionName ?? forkName,
+					model: state.model,
+					thinkingLevel: state.thinkingLevel,
 					messages: parseSessionMessages(rawMessages),
 					lastError: null,
 				}));
@@ -607,12 +619,93 @@ export function usePiChat() {
 		[createRuntime, refreshSessions, updateRuntime],
 	);
 
+	const loadModelConfiguration = useCallback(async (): Promise<PiModelConfiguration> => {
+		const key = selection.current.activeKey;
+		const record = key ? runtimesRef.current.get(key) : null;
+		if (!key || !record || record.snapshot.phase !== "ready" || !record.adapter.isConnected) {
+			throw new Error("Select a ready Pi session before configuring its model.");
+		}
+
+		const [models, state, thinkingLevels] = await Promise.all([
+			record.adapter.getAvailableModels(),
+			record.adapter.getState(),
+			record.adapter.getAvailableThinkingLevels(),
+		]);
+		if (runtimesRef.current.get(key) !== record || selection.current.activeKey !== key) {
+			throw new Error("The active session changed while loading model settings.");
+		}
+		updateRuntime(key, (snapshot) => ({
+			...snapshot,
+			model: state.model,
+			thinkingLevel: state.thinkingLevel,
+		}));
+		return { models, currentModel: state.model, thinkingLevel: state.thinkingLevel, thinkingLevels };
+	}, [updateRuntime]);
+
+	const setModel = useCallback(async (model: PiModelInfo) => {
+		const key = selection.current.activeKey;
+		const record = key ? runtimesRef.current.get(key) : null;
+		if (!key || !record || record.snapshot.phase !== "ready" || !record.adapter.isConnected) {
+			throw new Error("Select a ready Pi session before changing its model.");
+		}
+		if (record.snapshot.activity !== "idle" || record.snapshot.configuringModel) {
+			throw new Error("Wait for the active Pi session to become idle before changing its model.");
+		}
+
+		updateRuntime(key, (snapshot) => ({ ...snapshot, configuringModel: true, lastError: null }));
+		try {
+			const switchedModel = await record.adapter.setModel(model.provider, model.id);
+			const [state, thinkingLevels] = await Promise.all([
+				record.adapter.getState(),
+				record.adapter.getAvailableThinkingLevels(),
+			]);
+			if (runtimesRef.current.get(key) !== record) throw new Error("The session runtime closed while changing its model.");
+			const currentModel = state.model ?? switchedModel;
+			updateRuntime(key, (snapshot) => ({
+				...snapshot,
+				model: currentModel,
+				thinkingLevel: state.thinkingLevel,
+			}));
+			return { currentModel, thinkingLevel: state.thinkingLevel, thinkingLevels };
+		} catch (error) {
+			updateRuntime(key, (snapshot) => ({ ...snapshot, lastError: describeError(error) }));
+			throw error;
+		} finally {
+			updateRuntime(key, (snapshot) => ({ ...snapshot, configuringModel: false }));
+		}
+	}, [updateRuntime]);
+
+	const setThinkingLevel = useCallback(async (level: PiThinkingLevel) => {
+		const key = selection.current.activeKey;
+		const record = key ? runtimesRef.current.get(key) : null;
+		if (!key || !record || record.snapshot.phase !== "ready" || !record.adapter.isConnected) {
+			throw new Error("Select a ready Pi session before changing its thinking level.");
+		}
+		if (record.snapshot.activity !== "idle" || record.snapshot.configuringModel) {
+			throw new Error("Wait for the active Pi session to become idle before changing its thinking level.");
+		}
+
+		updateRuntime(key, (snapshot) => ({ ...snapshot, configuringModel: true, lastError: null }));
+		try {
+			await record.adapter.setThinkingLevel(level);
+			const state = await record.adapter.getState();
+			if (runtimesRef.current.get(key) !== record) throw new Error("The session runtime closed while changing its thinking level.");
+			updateRuntime(key, (snapshot) => ({ ...snapshot, model: state.model, thinkingLevel: state.thinkingLevel }));
+			return state.thinkingLevel;
+		} catch (error) {
+			updateRuntime(key, (snapshot) => ({ ...snapshot, lastError: describeError(error) }));
+			throw error;
+		} finally {
+			updateRuntime(key, (snapshot) => ({ ...snapshot, configuringModel: false }));
+		}
+	}, [updateRuntime]);
+
 	const send = useCallback(
 		async (text: string, requestedDelivery: ChatDelivery) => {
 			const key = selection.current.activeKey;
 			const record = key ? runtimesRef.current.get(key) : null;
 			const message = text.trim();
-			if (!key || !record || record.snapshot.phase !== "ready" || !message) return;
+			if (!key || !record || record.snapshot.phase !== "ready" || record.snapshot.configuringModel || !message) return;
 			const delivery: ChatDelivery = record.snapshot.activity === "idle"
 				? "prompt"
 				: requestedDelivery === "prompt"
@@ -693,6 +786,7 @@ export function usePiChat() {
 		sessionPath: snapshot.sessionPath,
 		phase: snapshot.phase,
 		activity: snapshot.activity,
+		configuringModel: snapshot.configuringModel,
 	}));
 
 	return {
@@ -702,6 +796,9 @@ export function usePiChat() {
 		queue: activeSnapshot?.queue ?? { steering: [], followUp: [] },
 		sending: activeSnapshot?.sending ?? false,
 		aborting: activeSnapshot?.aborting ?? false,
+		configuringModel: activeSnapshot?.configuringModel ?? false,
+		model: activeSnapshot?.model ?? null,
+		thinkingLevel: activeSnapshot?.thinkingLevel ?? "off",
 		lastError: activeSnapshot?.lastError ?? actionError,
 		workspacePath: workspaceRef.current,
 		sessions,
@@ -726,6 +823,9 @@ export function usePiChat() {
 		deleteSession,
 		loadForkOptions,
 		forkSession,
+		loadModelConfiguration,
+		setModel,
+		setThinkingLevel,
 		send,
 		abort,
 		clearError,

@@ -1,5 +1,13 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import {
+	normalizePiModel,
+	normalizePiModels,
+	normalizeThinkingLevel,
+	normalizeThinkingLevels,
+	type PiModelInfo,
+	type PiThinkingLevel,
+} from "../models/model-state";
 import type { JsonObject } from "./event-normalizer";
 
 export type StreamingBehavior = "steer" | "followUp";
@@ -18,6 +26,8 @@ export type PiAdapterEvent =
 	| { type: "rpc_stderr"; line: string };
 
 export type PiSessionState = Readonly<{
+	model: PiModelInfo | null;
+	thinkingLevel: PiThinkingLevel;
 	isStreaming: boolean;
 	isCompacting: boolean;
 	sessionFile?: string;
@@ -170,8 +180,46 @@ export class PiAdapter {
 		return this.request({ type: "new_session", ...(parentSession ? { parentSession } : {}) });
 	}
 
-	getState(): Promise<PiSessionState> {
-		return this.request({ type: "get_state" });
+	async getState(): Promise<PiSessionState> {
+		const state = await this.request<Record<string, unknown>>({ type: "get_state" });
+		return {
+			model: normalizePiModel(state.model),
+			thinkingLevel: normalizeThinkingLevel(state.thinkingLevel),
+			isStreaming: state.isStreaming === true,
+			isCompacting: state.isCompacting === true,
+			...(typeof state.sessionFile === "string" ? { sessionFile: state.sessionFile } : {}),
+			sessionId: typeof state.sessionId === "string" ? state.sessionId : "",
+			...(typeof state.sessionName === "string" ? { sessionName: state.sessionName } : {}),
+			messageCount: typeof state.messageCount === "number" ? state.messageCount : 0,
+			pendingMessageCount: typeof state.pendingMessageCount === "number" ? state.pendingMessageCount : 0,
+		};
+	}
+
+	getAvailableModels(): Promise<PiModelInfo[]> {
+		return this.request<{ models?: unknown }>({ type: "get_available_models" })
+			.then((data) => normalizePiModels(data.models));
+	}
+
+	async setModel(provider: string, modelId: string): Promise<PiModelInfo> {
+		const normalizedProvider = provider.trim();
+		const normalizedModelId = modelId.trim();
+		if (!normalizedProvider || !normalizedModelId) throw new Error("Choose a valid Pi model.");
+		const model = normalizePiModel(await this.request({
+			type: "set_model",
+			provider: normalizedProvider,
+			modelId: normalizedModelId,
+		}));
+		if (!model) throw new Error("Pi returned an invalid model after switching.");
+		return model;
+	}
+
+	getAvailableThinkingLevels(): Promise<PiThinkingLevel[]> {
+		return this.request<{ levels?: unknown }>({ type: "get_available_thinking_levels" })
+			.then((data) => normalizeThinkingLevels(data.levels));
+	}
+
+	setThinkingLevel(level: PiThinkingLevel): Promise<void> {
+		return this.request({ type: "set_thinking_level", level });
 	}
 
 	getMessages(): Promise<JsonObject[]> {
