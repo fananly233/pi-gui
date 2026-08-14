@@ -28,6 +28,16 @@ impl Default for RpcState {
     }
 }
 
+impl Drop for RpcState {
+    fn drop(&mut self) {
+        if let Ok(mut instances) = self.instances.lock() {
+            for (_, mut handle) in instances.drain() {
+                stop_rpc_instance(&mut handle);
+            }
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Clone)]
 struct RpcLineEventPayload {
     instance_id: String,
@@ -1054,17 +1064,13 @@ async fn list_sessions(app: AppHandle) -> Result<Vec<SessionInfo>, String> {
     Ok(sessions)
 }
 
-/// Delete one persisted Pi session without exposing a general-purpose file delete command.
-#[tauri::command]
-async fn delete_session(app: AppHandle, session_path: String) -> Result<bool, String> {
-    let sessions_dir = get_pi_sessions_dir(&app)?;
+fn resolve_session_file(sessions_dir: &Path, requested: &Path) -> Result<Option<PathBuf>, String> {
     if !sessions_dir.exists() {
-        return Ok(false);
+        return Ok(None);
     }
 
-    let requested = PathBuf::from(session_path.trim());
     if requested.as_os_str().is_empty() || !requested.exists() {
-        return Ok(false);
+        return Ok(None);
     }
 
     let sessions_root = fs::canonicalize(&sessions_dir)
@@ -1078,17 +1084,41 @@ async fn delete_session(app: AppHandle, session_path: String) -> Result<bool, St
         .unwrap_or(false);
 
     if !target.starts_with(&sessions_root) || !target.is_file() || !is_jsonl {
-        return Err("Refusing to delete a file outside the Pi sessions directory".to_string());
+        return Err("Refusing to access a file outside the Pi sessions directory".to_string());
     }
+
+    Ok(Some(target))
+}
+
+/// Delete one persisted Pi session without exposing a general-purpose file delete command.
+fn delete_session_file(sessions_dir: &Path, requested: &Path) -> Result<bool, String> {
+    let Some(target) = resolve_session_file(sessions_dir, requested)? else {
+        return Ok(false);
+    };
 
     fs::remove_file(&target).map_err(|e| format!("Failed to delete session: {}", e))?;
     Ok(true)
 }
 
+fn read_session_file(sessions_dir: &Path, requested: &Path) -> Result<String, String> {
+    let target = resolve_session_file(sessions_dir, requested)?
+        .ok_or_else(|| "Session file does not exist".to_string())?;
+    fs::read_to_string(&target).map_err(|e| format!("Failed to read session: {}", e))
+}
+
+#[tauri::command]
+async fn delete_session(app: AppHandle, session_path: String) -> Result<bool, String> {
+    let sessions_dir = get_pi_sessions_dir(&app)?;
+    let requested = PathBuf::from(session_path.trim());
+    delete_session_file(&sessions_dir, &requested)
+}
+
 /// Get the content of a session file
 #[tauri::command]
-async fn get_session_content(session_path: String) -> Result<String, String> {
-    fs::read_to_string(&session_path).map_err(|e| format!("Failed to read session: {}", e))
+async fn get_session_content(app: AppHandle, session_path: String) -> Result<String, String> {
+    let sessions_dir = get_pi_sessions_dir(&app)?;
+    let requested = PathBuf::from(session_path.trim());
+    read_session_file(&sessions_dir, &requested)
 }
 
 #[derive(Debug, Serialize)]
@@ -2441,7 +2471,7 @@ async fn open_path_in_default_app(path: String) -> Result<(), String> {
 }
 
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
@@ -2482,6 +2512,78 @@ pub fn run() {
             get_desktop_runtime_info,
             open_path_in_default_app,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|app_handle, event| {
+        if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
+            let state = app_handle.state::<RpcState>();
+            if let Ok(mut instances) = state.instances.lock() {
+                for (_, mut handle) in instances.drain() {
+                    stop_rpc_instance(&mut handle);
+                }
+            };
+        }
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{delete_session_file, read_session_file};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_root() -> std::path::PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("pi-desktop-session-delete-{}-{}", std::process::id(), nonce))
+    }
+
+    #[test]
+    fn deletes_only_jsonl_files_inside_the_sessions_root() {
+        let root = test_root();
+        let sessions = root.join("sessions");
+        let nested = sessions.join("project");
+        fs::create_dir_all(&nested).expect("create test sessions directory");
+        let session = nested.join("session.jsonl");
+        fs::write(&session, "{\"type\":\"session\"}\n").expect("write test session");
+
+        assert!(delete_session_file(&sessions, &session).expect("delete valid session"));
+        assert!(!session.exists());
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn rejects_files_outside_the_sessions_root() {
+        let root = test_root();
+        let sessions = root.join("sessions");
+        fs::create_dir_all(&sessions).expect("create test sessions directory");
+        let outside = root.join("outside.jsonl");
+        fs::write(&outside, "{\"type\":\"session\"}\n").expect("write outside file");
+
+        let error = delete_session_file(&sessions, &outside).expect_err("outside file must be rejected");
+        assert!(error.contains("outside the Pi sessions directory"));
+        assert!(outside.exists());
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn reads_only_jsonl_files_inside_the_sessions_root() {
+        let root = test_root();
+        let sessions = root.join("sessions");
+        fs::create_dir_all(&sessions).expect("create test sessions directory");
+        let session = sessions.join("session.jsonl");
+        let outside = root.join("outside.jsonl");
+        fs::write(&session, "{\"type\":\"session\"}\n").expect("write session file");
+        fs::write(&outside, "secret\n").expect("write outside file");
+
+        assert_eq!(
+            read_session_file(&sessions, &session).expect("read valid session"),
+            "{\"type\":\"session\"}\n"
+        );
+        assert!(read_session_file(&sessions, &outside).is_err());
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
 }
