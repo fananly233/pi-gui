@@ -17,6 +17,12 @@ Pi Desktop is intentionally **minimal** and **extension-first**:
 - the `pi` CLI is the runtime,
 - packages/extensions provide optional behavior.
 
+## Project lineage
+
+This repository is a derivative of [Gustav Pi Desktop](https://github.com/gustavonline/pi-desktop), using its Tauri 2/Rust/Pi RPC implementation as the native base. Selected React UI ideas and visual tokens are adapted from [DLYZZT Pi Desktop](https://github.com/DLYZZT/pi-desktop) under Apache-2.0. The code here contains additional modifications and is not presented as an official release of either upstream project.
+
+Exact source revisions, licenses, and modification boundaries are recorded in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) and [MIGRATION_MATRIX.md](./MIGRATION_MATRIX.md).
+
 <img width="1227" height="869" alt="Screenshot 2026-03-28 at 23 28 39" src="https://github.com/user-attachments/assets/0c15a79f-870c-44a0-9489-4b0d2d577e76" />
 
 
