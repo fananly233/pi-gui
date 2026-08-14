@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
 	SessionSelectionGuard,
+	isSessionRuntimeTransitioning,
 	normalizeFsPath,
 	sessionBelongsToWorkspace,
 	sessionInstanceId,
@@ -54,6 +55,13 @@ test("runtime updates stay isolated to their owning session", () => {
 	assert.equal(next.get("a").lastError, "A only");
 	assert.strictEqual(next.get("b"), runtimeB);
 	assert.deepEqual(next.get("b").messages, [messageB]);
+});
+
+test("treats starting and switching runtimes as unsafe for file mutation", () => {
+	assert.equal(isSessionRuntimeTransitioning("starting"), true);
+	assert.equal(isSessionRuntimeTransitioning("switching"), true);
+	assert.equal(isSessionRuntimeTransitioning("ready"), false);
+	assert.equal(isSessionRuntimeTransitioning("failed"), false);
 });
 
 test("normalizes Windows workspace paths and creates stable instance ids", () => {

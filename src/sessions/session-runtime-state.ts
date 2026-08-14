@@ -2,6 +2,10 @@ import type { ChatActivity, ChatMessage } from "../chat/chat-types";
 
 export type SessionRuntimePhase = "starting" | "switching" | "ready" | "failed";
 
+export function isSessionRuntimeTransitioning(phase: SessionRuntimePhase): boolean {
+	return phase === "starting" || phase === "switching";
+}
+
 export type SessionRuntimeSnapshot = Readonly<{
 	key: string;
 	cwd: string;

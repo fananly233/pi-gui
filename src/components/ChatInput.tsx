@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import type { ChatActivity, ChatDelivery } from "../chat/chat-types";
 
 type ChatInputProps = {
@@ -8,14 +8,19 @@ type ChatInputProps = {
 	aborting: boolean;
 	onSend: (text: string, delivery: ChatDelivery) => Promise<void>;
 	onAbort: () => Promise<void>;
+	seed: { id: number; text: string } | null;
 };
 
-export function ChatInput({ connected, activity, sending, aborting, onSend, onAbort }: ChatInputProps) {
+export function ChatInput({ connected, activity, sending, aborting, onSend, onAbort, seed }: ChatInputProps) {
 	const [text, setText] = useState("");
 	const [queuedDelivery, setQueuedDelivery] = useState<Exclude<ChatDelivery, "prompt">>("steer");
 	const running = activity !== "idle";
 	const delivery: ChatDelivery = running ? queuedDelivery : "prompt";
 	const canSend = connected && text.trim().length > 0 && !sending;
+
+	useEffect(() => {
+		if (seed) setText(seed.text);
+	}, [seed]);
 
 	const submit = () => {
 		if (!canSend) return;

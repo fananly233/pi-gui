@@ -6,6 +6,7 @@ import { PiAdapter, type PiAdapterEvent, type PiForkOption } from "../pi/pi-adap
 import { parseSessionMessages } from "../sessions/session-message-parser";
 import {
 	SessionSelectionGuard,
+	isSessionRuntimeTransitioning,
 	normalizeFsPath,
 	sessionBelongsToWorkspace,
 	sessionInstanceId,
@@ -164,6 +165,7 @@ export function usePiChat() {
 	const connectionEpoch = useRef(0);
 	const draftSequence = useRef(0);
 	const userSequence = useRef(0);
+	const composerSequence = useRef(0);
 	const [connection, setConnection] = useState<PiConnectionState>({ status: "disconnected" });
 	const [runtimeSnapshots, setRuntimeSnapshots] = useState(new Map<string, SessionRuntimeSnapshot>());
 	const [activeRuntimeKey, setActiveRuntimeKey] = useState<string | null>(null);
@@ -395,6 +397,7 @@ export function usePiChat() {
 			setActiveRuntimeKey(null);
 			setSelectingRuntimeKey(null);
 			setActionError(null);
+			setComposerSeed({ id: ++composerSequence.current, text: "" });
 			setConnection({ status: "connecting" });
 			setSessions([]);
 			await disposeAllRuntimes();
@@ -419,6 +422,7 @@ export function usePiChat() {
 		setSelectingRuntimeKey(null);
 		setSessionAction(null);
 		setActionError(null);
+		setComposerSeed({ id: ++composerSequence.current, text: "" });
 		setSessions([]);
 		setSessionsError(null);
 		setSessionsLoading(false);
@@ -437,6 +441,7 @@ export function usePiChat() {
 				const record = await ensurePersistedRuntime(session);
 				if (!selection.current.commit(ticket)) return;
 				setActiveRuntimeKey(record.key);
+				setComposerSeed({ id: ++composerSequence.current, text: "" });
 				setConnection({ status: "connected", discovery: record.snapshot.discovery || "Pi session ready" });
 			} catch (error) {
 				if (selection.current.isCurrent(ticket)) setActionError(describeError(error));
@@ -474,6 +479,7 @@ export function usePiChat() {
 			}));
 			if (selection.current.commit(ticket)) {
 				setActiveRuntimeKey(key);
+				setComposerSeed({ id: ++composerSequence.current, text: "" });
 				setConnection({ status: "connected", discovery: start.discovery });
 			}
 			await refreshSessions();
@@ -511,13 +517,16 @@ export function usePiChat() {
 		async (session: DesktopSessionInfo) => {
 			setSessionAction({ type: "delete", path: session.path });
 			setActionError(null);
-			try {
-				const record = findRuntimeByPath(session.path);
-				if (record?.snapshot.activity !== "idle") throw new Error("Stop this session before deleting it.");
+		try {
+			const record = findRuntimeByPath(session.path);
+			if (record && (record.snapshot.activity !== "idle" || isSessionRuntimeTransitioning(record.snapshot.phase))) {
+				throw new Error("Wait for this session to finish opening or running before deleting it.");
+			}
 				if (record) {
 					if (activeRuntimeKey === record.key) {
 						selection.current.invalidate();
 						setActiveRuntimeKey(null);
+						setComposerSeed({ id: ++composerSequence.current, text: "" });
 					}
 					await removeRuntime(record);
 				}
@@ -583,7 +592,7 @@ export function usePiChat() {
 				if (selection.current.commit(ticket)) {
 					setActiveRuntimeKey(key);
 					setConnection({ status: "connected", discovery: start.discovery });
-					setComposerSeed({ id: Date.now(), text: forked.text || option.text });
+					setComposerSeed({ id: ++composerSequence.current, text: forked.text || option.text });
 				}
 				await refreshSessions();
 			} catch (error) {
@@ -668,8 +677,23 @@ export function usePiChat() {
 	const activeSnapshot = activeRuntimeKey ? runtimeSnapshots.get(activeRuntimeKey) ?? null : null;
 	const activity: ChatActivity = activeSnapshot?.activity ?? "idle";
 	const activeSessionPath = activeSnapshot?.sessionPath ?? null;
-	const activeSessionName = activeSnapshot?.sessionName ?? null;
+	const listedActiveSession = activeSessionPath
+		? sessions.find((session) => normalizeFsPath(session.path) === normalizeFsPath(activeSessionPath)) ?? null
+		: null;
+	const activeSessionName = activeSnapshot?.sessionName
+		?? listedActiveSession?.name
+		?? (listedActiveSession
+			? `Session ${listedActiveSession.id.slice(0, 8)}`
+			: activeRuntimeKey?.startsWith("draft:")
+				? "New session"
+				: null);
 	const sessionReady = connection.status === "connected" && activeSnapshot?.phase === "ready";
+	const sessionRuntimes = [...runtimeSnapshots.values()].map((snapshot) => ({
+		key: snapshot.key,
+		sessionPath: snapshot.sessionPath,
+		phase: snapshot.phase,
+		activity: snapshot.activity,
+	}));
 
 	return {
 		connection,
@@ -683,7 +707,9 @@ export function usePiChat() {
 		sessions,
 		sessionsLoading,
 		sessionsError,
+		sessionActionError: actionError,
 		sessionAction,
+		sessionRuntimes,
 		selectingRuntimeKey,
 		activeRuntimeKey,
 		activeSessionPath,

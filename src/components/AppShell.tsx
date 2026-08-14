@@ -3,6 +3,7 @@ import type { DesktopRuntimeInfo } from "../api/desktop-api";
 import type { PiChatController } from "../hooks/usePiChat";
 import { applyTheme, readStoredTheme, storeTheme, type Theme } from "../theme";
 import { ChatWindow } from "./ChatWindow";
+import { SessionSidebar } from "./SessionSidebar";
 import { TitleBar } from "./TitleBar";
 
 export type RuntimeState =
@@ -36,7 +37,7 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 	const [theme, setTheme] = useState<Theme>(() => readStoredTheme());
 	const connectionBusy = chat.connection.status === "connecting";
 	const connected = chat.connection.status === "connected";
-	const connectionTone = connected ? "ready" : connectionBusy ? "loading" : chat.connection.status === "error" ? "error" : "muted";
+	const connectionTone = chat.sessionReady ? (chat.activity === "idle" ? "ready" : "loading") : connected ? "ready" : connectionBusy ? "loading" : chat.connection.status === "error" ? "error" : "muted";
 
 	const toggleTheme = () => {
 		const nextTheme: Theme = theme === "dark" ? "light" : "dark";
@@ -60,8 +61,8 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 						<div className="connection-card__heading">
 							<span className={`status-dot status-dot--${connectionTone}`} aria-hidden="true" />
 							<div>
-								<strong>{connected ? "Pi connected" : connectionBusy ? "Starting Pi" : "Pi runtime"}</strong>
-								<span>{connected ? (chat.activity === "idle" ? "Ready" : "Agent running") : "System CLI · configured model"}</span>
+								<strong>{chat.sessionReady ? "Pi connected" : connected ? "Session index ready" : connectionBusy ? "Reading sessions" : "Pi runtime"}</strong>
+								<span>{chat.sessionReady ? (chat.activity === "idle" ? "Active session ready" : "Agent running") : connected ? "Choose or create a session" : "System CLI · configured model"}</span>
 							</div>
 						</div>
 
@@ -98,20 +99,8 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 						) : null}
 					</section>
 
-					<nav className="sidebar__nav" aria-label="Shell destinations">
-						<button type="button" className="nav-item nav-item--active" aria-current="page">
-							<span className="nav-icon" aria-hidden="true">◫</span>
-							<span>Core chat</span>
-							<small>Phase 2</small>
-						</button>
-						<button type="button" className="nav-item" disabled>
-							<span className="nav-icon" aria-hidden="true">◎</span>
-							<span>Sessions</span>
-							<small>Phase 3</small>
-						</button>
-					</nav>
+					<SessionSidebar chat={chat} />
 
-					<div className="sidebar__spacer" />
 					<div className={`sidebar__runtime sidebar__runtime--${runtimeState.status}`}>
 						<span className={`status-dot status-dot--${runtimeState.status}`} aria-hidden="true" />
 						<RuntimePanel state={runtimeState} onRetry={onRetryRuntime} />
@@ -127,6 +116,12 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 						sending={chat.sending}
 						aborting={chat.aborting}
 						lastError={chat.lastError}
+						sessionReady={chat.sessionReady}
+						activeSessionName={chat.activeSessionName}
+						activeSessionPath={chat.activeSessionPath}
+						activeRuntimePhase={chat.activeRuntimePhase}
+						selectingRuntimeKey={chat.selectingRuntimeKey}
+						composerSeed={chat.composerSeed}
 						send={chat.send}
 						abort={chat.abort}
 						clearError={chat.clearError}
