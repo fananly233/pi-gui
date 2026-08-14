@@ -23,6 +23,10 @@ This repository is a derivative of [Gustav Pi Desktop](https://github.com/gustav
 
 Exact source revisions, licenses, and modification boundaries are recorded in [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) and [MIGRATION_MATRIX.md](./MIGRATION_MATRIX.md).
 
+## Current migration status
+
+The active React renderer currently implements **Phase 2: Pi Core Chat**: native RPC startup, prompt streaming, thinking, tool cards, steer/follow-up queues, abort, Markdown, and repeat prompts. Sessions, model/auth management, files, terminal, packages, and managed runtime remain later migration phases. Feature inventories below describe the Gustav upstream baseline and migration targets; they are not all exposed by the current React UI yet.
+
 <img width="1227" height="869" alt="Screenshot 2026-03-28 at 23 28 39" src="https://github.com/user-attachments/assets/0c15a79f-870c-44a0-9489-4b0d2d577e76" />
 
 
@@ -203,6 +207,15 @@ npm run check
 npm run build:frontend
 npm run tauri build
 ```
+
+### Phase 2 verification
+
+```bash
+npm test
+npm run gate:pi-real
+```
+
+`gate:pi-real` starts the installed Pi CLI in real RPC mode with `--no-session`. It defaults to `deepseek/deepseek-v4-flash` and can be redirected with `PI_GUI_GATE_PROVIDER`, `PI_GUI_GATE_MODEL`, and `PI_GUI_GATE_CWD`.
 
 Artifacts are generated under:
 
