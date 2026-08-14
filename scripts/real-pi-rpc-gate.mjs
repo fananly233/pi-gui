@@ -170,7 +170,7 @@ try {
 	const stateResponse = await harness.request({ type: "get_state" });
 	assert.equal(stateResponse.data?.model?.provider, provider);
 	assert.equal(stateResponse.data?.model?.id, model);
-	await harness.request({ type: "set_thinking_level", level: "off" });
+	await harness.request({ type: "set_thinking_level", level: "low" });
 	console.log("[gate] startup and correlated responses: PASS");
 
 	const firstRun = await harness.promptAndSettle("Reply with exactly PI_GUI_FIRST_OK. Do not use tools.");
@@ -180,7 +180,9 @@ try {
 		.join("\n");
 	assert.match(firstText, /PI_GUI_FIRST_OK/);
 	assert.ok(firstRun.normalized.some((event) => event.type === "assistant_text_delta"), "Expected a real streaming text delta.");
-	console.log("[gate] first prompt and delta-only stream: PASS");
+	assert.ok(firstRun.normalized.some((event) => event.type === "assistant_thinking_delta"), "Expected a real streaming thinking delta.");
+	await harness.request({ type: "set_thinking_level", level: "off" });
+	console.log("[gate] first prompt with delta-only text and thinking streams: PASS");
 
 	const secondRun = await harness.promptAndSettle(
 		"Use the bash tool exactly once to run: node -e \"process.stdout.write('PI_GUI_TOOL_OK')\". After it succeeds, reply with exactly PI_GUI_SECOND_OK.",

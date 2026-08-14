@@ -41,7 +41,7 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | `npm run build:frontend` | PASS | 300 modules; 390.69 kB JavaScript and 14.64 kB CSS before gzip. |
 | `cargo check --manifest-path src-tauri/Cargo.toml` | PASS WITH EXISTING WARNING | The Rust tree remains unchanged; the baseline unused `app` warning remains. |
 | `npm audit --omit=dev` | PASS | Zero production vulnerabilities. The full dev audit still reports the six inherited Vite toolchain advisories recorded in Phase 1. |
-| `npm run gate:pi-real` | PASS | Real Pi 0.84.2 with `deepseek/deepseek-v4-flash`; strict LF JSONL, correlated responses, delta-only stream, real bash tool, second prompt, steer/follow-up queues, in-flight abort, and settled state all passed without mocks. |
+| `npm run gate:pi-real` | PASS | Real Pi 0.84.2 with `deepseek/deepseek-v4-flash`; strict LF JSONL, correlated responses, delta-only text/thinking streams, real bash tool, second prompt, steer/follow-up queues, in-flight abort, and settled state all passed without mocks. |
 | Windows `npm run tauri dev` | PASS | Gustav Rust discovered the system Volta `pi.cmd`; React connected through Tauri, rendered real streaming output, a real bash tool card, a completed second prompt, and an interrupted long-running tool before returning to Ready. |
 | Provider failure recovery | PASS | The configured default `openai-codex` model returned its real usage-limit error; the UI surfaced it and returned to Ready. Successful GUI checks used a temporary local DeepSeek launch wrapper that was removed after validation. |
 | Process and architecture cleanup | PASS | No test Pi RPC process or launch wrapper remained; no Electron host, `window.piBridge`, Browser Agent, or Channels code was introduced. |
