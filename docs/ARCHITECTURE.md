@@ -12,7 +12,7 @@ Pi Desktop is a 3-layer system:
 
 ```text
 User
-  -> Pi Desktop UI (Lit + Tauri shell)
+  -> Pi Desktop UI (React + Tauri shell)
     -> RPC bridge (stdin/stdout)
       -> pi --mode rpc runtime
         -> packages/extensions/skills/prompts/themes
@@ -41,7 +41,7 @@ Owns:
 - tool execution pipeline
 - package loading and runtime behavior
 
-Pi Desktop talks to this runtime over a typed RPC bridge (`src/rpc/bridge.ts`).
+Pi Desktop talks to this runtime through the typed frontend adapter in `src/pi/pi-adapter.ts` and the Tauri/Rust process bridge in `src-tauri/src/lib.rs`.
 
 ## 3) Packages/extensions
 
@@ -67,14 +67,14 @@ When implementing package/extension-specific desktop affordances, follow [`docs/
 
 ## Runtime/session design
 
-Pi Desktop supports multiple sessions and runtime switching.
+Pi Desktop supports multiple sessions with one isolated Pi RPC runtime per opened session.
 
 Key goals:
 - avoid cross-session state bleed
 - avoid stale event application when switching fast
 - keep UI responsive during reconnects/restarts
 
-The app tracks runtime activity and binds/unbinds session context so each tab can behave predictably.
+Each runtime has a stable instance id and a Rust generation. Pi events update only the snapshot owned by that runtime, while a monotonic selection guard prevents a slower session load from replacing a newer selection. Closing or disconnecting drains every runtime process.
 
 ---
 

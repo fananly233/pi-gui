@@ -25,7 +25,7 @@ Exact source revisions, licenses, and modification boundaries are recorded in [T
 
 ## Current migration status
 
-The active React renderer currently implements **Phase 2: Pi Core Chat**: native RPC startup, prompt streaming, thinking, tool cards, steer/follow-up queues, abort, Markdown, and repeat prompts. Sessions, model/auth management, files, terminal, packages, and managed runtime remain later migration phases. Feature inventories below describe the Gustav upstream baseline and migration targets; they are not all exposed by the current React UI yet.
+The active React renderer currently implements **Phase 3: Sessions**. It includes the Phase 2 real Pi chat path plus explicit workspace connection, workspace-scoped persisted sessions, isolated Pi runtimes, list/new/resume/switch/rename/delete/fork flows, and restored history. Model/auth management, files, terminal/git, packages, and managed runtime remain later migration phases. Feature inventories below describe the Gustav upstream baseline and migration targets; they are not all exposed by the current React UI yet.
 
 <img width="1227" height="869" alt="Screenshot 2026-03-28 at 23 28 39" src="https://github.com/user-attachments/assets/0c15a79f-870c-44a0-9489-4b0d2d577e76" />
 
@@ -208,14 +208,17 @@ npm run build:frontend
 npm run tauri build
 ```
 
-### Phase 2 verification
+### Phase 2–3 verification
 
 ```bash
 npm test
 npm run gate:pi-real
+npm run gate:sessions-real
 ```
 
 `gate:pi-real` starts the installed Pi CLI in real RPC mode with `--no-session`. It defaults to `deepseek/deepseek-v4-flash` and can be redirected with `PI_GUI_GATE_PROVIDER`, `PI_GUI_GATE_MODEL`, and `PI_GUI_GATE_CWD`.
+
+`gate:sessions-real` uses an isolated temporary session directory and proves new, rename, history restore, fork, switch/resume, persistence, and resume after a real Pi process restart. A caller-supplied `PI_GUI_GATE_SESSION_DIR` is always preserved; set `PI_GUI_GATE_KEEP_SESSIONS=1` to retain an automatically created test directory.
 
 Artifacts are generated under:
 
@@ -230,12 +233,12 @@ See:
 - **[`docs/CAPABILITY_MODEL.md`](./docs/CAPABILITY_MODEL.md)**
 
 Short version:
-- **Frontend (Lit/TypeScript)**: UI shell, panes, interactions
+- **Frontend (React 19/TypeScript)**: UI shell, chat, session workflows, and interactions
 - **Tauri backend (Rust)**: native bridge, CLI process management, filesystem/window commands
 - **Pi RPC bridge**: typed JSON-RPC-style line protocol over stdin/stdout
 - **Packages/extensions**: opt-in behavior and UI integrations through the extension UI protocol
 
-> Stack note: this project uses **Lit**, not React.
+> Migration note: the active renderer is React; the Tauri/Rust host remains based on Gustav Pi Desktop.
 
 ---
 

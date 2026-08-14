@@ -46,6 +46,22 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Provider failure recovery | PASS | The configured default `openai-codex` model returned its real usage-limit error; the UI surfaced it and returned to Ready. Successful GUI checks used a temporary local DeepSeek launch wrapper that was removed after validation. |
 | Process and architecture cleanup | PASS | No test Pi RPC process or launch wrapper remained; no Electron host, `window.piBridge`, Browser Agent, or Channels code was introduced. |
 
+## Phase 3 verification (2026-08-14, Windows)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| `npm test` | PASS | Nine deterministic tests cover rapid latest-selection wins, per-runtime message isolation, Windows path normalization, persisted history hydration, transition-state file-mutation guards, and the Phase 2 event normalizer. |
+| `npm run check` | PASS | The session controller, sidebar workflows, composer seeding, and desktop API pass strict TypeScript. |
+| `npm run build:frontend` | PASS | 303 modules; 410.92 kB JavaScript and 20.95 kB CSS before gzip. |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | PASS WITH EXISTING WARNING | The inherited unused `app` setup parameter remains; no new Rust warning was introduced. |
+| `cargo test --lib --manifest-path src-tauri/Cargo.toml` | PASS | Three Rust tests prove valid session deletion, rejection outside the Pi sessions root, and bounded `.jsonl` reads. |
+| `npm audit --omit=dev` | PASS | Zero production vulnerabilities. |
+| `npm run gate:sessions-real` | PASS | Real Pi 0.84.2 with `deepseek/deepseek-v4-flash`; new, rename, persisted prompt/history, fork points, fork, switch/resume, three JSONL files, and resume after an actual Pi process restart passed without mocks. |
+| Real Windows session UI | PASS | Explicit workspace connection listed only matching real sessions; persisted history, new, rename, fork prompt restoration, and composer clearing were exercised against isolated data. Rapid A→B→A switching converged on A without cross-session messages. |
+| Multi-runtime lifecycle | PASS | Separate instance/generation-scoped Pi processes were observed for loaded sessions. Closing the Tauri window reduced three live Pi RPC process trees to zero. |
+| Read-only MCO review | PASS WITH FIXES | The review found a transition-state delete edge and an inherited unrestricted session-content read. Both received minimal guards and deterministic tests; speculative composer-seed and duplicate-runtime claims were rejected after tracing the selection guard and path lookup. |
+| Static architecture scan | PASS | No Electron dependency or host directories, `window.piBridge`, Browser Agent, or Channels implementation was introduced. |
+
 ## Migration decisions
 
 | Feature | DLYZZT source | Gustav source | Strategy | Priority | Risk | Verification |
@@ -57,7 +73,7 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Runtime information and native window controls | Electron `PiBridge` concepts only | `get_desktop_runtime_info`, Tauri window permissions | ADAPT | P0 | Low | Runtime platform/arch/version render; minimize, maximize/restore, close work. |
 | Chat composer and timeline | React chat components | `src/components/chat-view*`, `src/rpc/bridge.ts` | ADAPT | P0 | High | Phase 2 real streaming gate; no mock transport. |
 | Pi 0.84.2 event normalization | Electron agent host contracts | Current RPC event stream | REWRITE_MINIMAL | P0 | High | Delta-only `message_update`, strict LF JSONL, tool and abort tests. |
-| Sessions and history | Session contracts and presentation ideas | Rust session commands and Lit session browser | ADAPT | P0 | Medium | Phase 3 list/open/resume/fork against real session files. |
+| Sessions and history | Session contracts and presentation ideas | Rust session commands and Lit session browser | ADAPT | P0 | Medium | Phase 3 deterministic race tests, real session RPC gate, isolated Windows UI flows, and process-cleanup check. |
 | Models, providers, and authentication | React presentation ideas | Rust auth/model commands | ADAPT | P1 | Medium | Phase 4 provider discovery and login/logout diagnostics. |
 | File browsing and editing | React file UI ideas | Tauri fs/dialog plugins and file viewer | ADAPT | P1 | Medium | Phase 5 open/save plus capability-scope checks. |
 | Terminal, git, and worktrees | React presentation ideas | Shell capability allow-list and Rust git commands | ADAPT | P1 | High | Phase 6 shell lifecycle, git status, and worktree safety tests. |
@@ -66,4 +82,4 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Electron main, preload, and agent host | `src/main`, `src/preload`, `src/agent-host` | None | DROP | P0 | Low | Static scan contains no Electron dependency or host bootstrap. |
 | Browser Agent and Channels | Browser and Channels trees | None | DROP | P0 | Low | Static scan contains no Browser Agent or Channels source. |
 
-Phase 2 adds a minimal `PiAdapter`, delta-aware `EventNormalizer`, React chat timeline/composer, and a real Pi gate. It does not introduce `window.piBridge`, sessions, model/auth management, Electron host code, or mock Pi behavior.
+Phase 3 adds explicit workspace-scoped session discovery, one isolated Pi runtime per opened session, list/new/resume/switch/rename/delete/fork workflows, persisted message hydration, stale-selection rejection, and a real restart gate. It does not introduce model/auth management, files, terminal/git, package management, Electron host code, or mock Pi behavior.
