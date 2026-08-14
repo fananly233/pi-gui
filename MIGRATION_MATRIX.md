@@ -15,9 +15,22 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | `npm run build:frontend` | PASS WITH WARNINGS | Vite 7.3.1 built 1,765 modules. Existing warnings cover mixed static/dynamic imports and a 1.44 MB JavaScript chunk. |
 | `cargo check --manifest-path src-tauri/Cargo.toml` | PASS WITH WARNING | Existing Windows-only warning: unused `app` setup parameter at `src-tauri/src/lib.rs:2418`. |
 | `npm audit --omit=dev` | RECORDED | Existing lockfile: 21 vulnerabilities (1 low, 4 moderate, 15 high, 1 critical), primarily in the legacy `pi-cursor-agent` dependency chain and the locked Vite generation. No baseline dependency fix was attempted. |
-| `npm run tauri dev` | PASS | Vite became ready, Rust completed, and `target/debug/pi-desktop.exe` opened a real Tauri window. The Gustav workspace/sidebar shell rendered and closed normally. |
+| `npm run tauri dev` | PASS WITH EXISTING WARNINGS | Vite became ready, Rust completed, and `target/debug/pi-desktop.exe` opened a real Tauri window. The Gustav workspace/sidebar shell rendered and closed normally. Tauri also reported pre-existing JS/Rust minor-version mismatches for core API, dialog, and fs packages. |
 | MCO Gustav Scout | PASS | `pi:deepseek/deepseek-v4-flash`, read-only, scoped to Tauri/Rust/RPC/sessions/files/terminal/auth/packages. |
 | MCO DLYZZT Scout | PASS | `pi:deepseek/deepseek-v4-flash`, read-only, scoped to React foundations/contracts and explicitly excluding Electron host, Browser, Channels, Chat, and Settings. |
+
+## Phase 1 verification (2026-08-14, Windows)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| `npm run check` | PASS | React 19 shell and thin desktop API compile under strict TypeScript. |
+| `npm run build:frontend` | PASS | 39 modules; 214.21 kB JavaScript and 8.40 kB CSS before gzip. No large-chunk warning. |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | PASS WITH EXISTING WARNING | Rust tree is unchanged; the baseline unused `app` warning remains. |
+| `npm audit --omit=dev` | PASS | Zero production vulnerabilities after removing the unused legacy renderer dependency chain. A full dev audit still reports six inherited Vite toolchain advisories (`esbuild`, `nanoid`, `picomatch`, `postcss`, `rollup`, `vite`). |
+| Static architecture scan | PASS | No Electron dependency, `window.piBridge`, Electron `src/main/`, `src/preload/`, `src/agent-host/`, Browser Agent, or Channels implementation. |
+| Windows `npm run tauri dev` | PASS | React shell opened without an Agent Host wait page; Rust returned `windows`, `x86_64`, and `v1.0.0`. |
+| Theme behavior | PASS | Light/dark toggle changed the rendered palette and remained selected after reload. |
+| Window behavior | PASS | Custom minimize, maximize/restore, close, and explicit Tauri titlebar dragging were exercised in the real window. |
 
 ## Migration decisions
 

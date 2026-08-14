@@ -12,8 +12,8 @@
 		"noEmit": true,
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"types": ["vite/client"],
-		"experimentalDecorators": true,
-		"useDefineForClassFields": false
+		"jsx": "react-jsx",
+		"useDefineForClassFields": true
 	},
 	"include": ["src"]
 }
