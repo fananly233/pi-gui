@@ -114,6 +114,25 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Read-only MCO Scout | PASS WITH FIXES | One scoped `pi:deepseek/deepseek-v4-flash` Scout identified the inherited arbitrary Git command and broad renderer shell permissions. Both were replaced/removed before verification. |
 | Static architecture scan | PASS | No Electron host directory, `window.piBridge`, Browser Agent, Channels, arbitrary Git command, or renderer shell process capability was introduced. |
 
+## Phase 7 verification (2026-08-14, Windows)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| `npm test` | PASS | Nineteen deterministic renderer tests include Pi 0.84.2 `sourceInfo` normalization, malformed/duplicate command rejection, and exclusion of unrelated RPC fields. |
+| `npm run check` | PASS | The typed ecosystem API, active-session command discovery, composer staging, and React panel pass strict TypeScript. |
+| `npm run build:frontend` | PASS | 318 modules. The main bundle is 462.76 kB and the unchanged lazy terminal chunk is 333.94 kB before gzip. |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | PASS WITH EXISTING WARNING | Only the inherited Windows-only unused `app` setup parameter remains; no Phase 7 Rust warning was introduced. |
+| `cargo test --lib --manifest-path src-tauri/Cargo.toml` | PASS | Seventeen Rust tests include package-list parsing, argument/source validation, workspace-contained local installs, and bounded direct-theme discovery. The existing Windows ConPTY test now allows a five-second exit budget so it remains stable under parallel test load. |
+| `npm audit --omit=dev` | PASS | Zero production vulnerabilities. The inherited development-tool advisories remain outside the production tree. |
+| `npm run gate:ecosystem-real` | PASS | Real Pi 0.84.2 completed isolated user install/list/update/remove, verified the project trust boundary, completed approved project install/list/update/remove, and served RPC `get_commands` for a real prompt and skill. The actual Pi settings-file hash was unchanged. |
+| Real Windows ecosystem UI | PASS WITH AUTOMATION LIMIT | The default typed Tauri list rendered five user packages, the `Show project` trust gate, and twelve built-in/direct themes. Computer Use transitioned the read-only project list but could not retain the WebView native confirmation for capture/cancellation; no package mutation was performed. An earlier ready real session rendered 26 Pi-reported commands (18 extensions/plugins and 8 skills), and `Use` staged `/agents` without executing it. |
+| Package authority boundary | PASS | The arbitrary WebView `run_pi_cli_command` handler was removed. Typed package operations serialize mutations, cap output, time out, stop their owned child on exit, reject option-like sources, and restrict local installs to the selected workspace. Project packages are hidden by default and listed only after explicit trust confirmation. |
+| Pi policy boundary | PASS | Install/remove/update/list stay delegated to Pi. User-only operations use `--no-approve`; project list/install/remove/update use Pi's `--approve` only after an explicit trust or full-system-access confirmation. Desktop does not implement gallery recommendations, package filters, or `pi config` policy. |
+| Resource/theme boundary | PASS WITH DOCUMENTED LIMIT | Extensions, plugins, skills, and prompts come from live RPC `get_commands/sourceInfo`. Pi 0.84.2 has no RPC theme-list command, so Desktop shows only Pi built-ins plus direct user/project `themes/*.json`; package-owned themes remain represented and managed by their package. |
+| Windows process lifecycle | PASS | Closing the verified Tauri window left zero workspace-owned desktop, Vite/Cargo dev, or Pi RPC processes. |
+| Read-only MCO Scout | PASS WITH MANUAL CORRECTIONS | One scoped `pi:deepseek/deepseek-v4-flash` Scout informed the boundary. Installed Pi source disproved its stale flat command-field assumption and its blanket no-`--approve` recommendation; implementation follows real 0.84.2 `sourceInfo` and project-write requirements. |
+| Static architecture scan | PASS | No Electron dependency/host, `window.piBridge`, Browser Agent, Channels, generic Pi CLI handler, or renderer shell process capability was introduced. |
+
 ## Migration decisions
 
 | Feature | DLYZZT source | Gustav source | Strategy | Priority | Risk | Verification |
@@ -129,9 +148,11 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Models, providers, and authentication | React presentation ideas | Rust auth/provider discovery plus Pi model RPC | ADAPT | P1 | Medium | Phase 4 safe catalog tests, isolated auth-file tests, real model/thinking gate, restart/session isolation, and Windows UI checks. |
 | File browsing, editing, `@file`, and image attachments | React file UI ideas | Rust path helpers, native dialog, file-viewer semantics, and Pi image RPC | ADAPT | P1 | Medium | Phase 5 deterministic mention tests, Rust containment/save tests, and real Windows preview/attachment UI checks. |
 | Terminal, git, and worktrees | React presentation ideas | Native process/Git foundations | ADAPT | P1 | High | Real ConPTY test, typed Git status/diff, guarded worktree test, real Windows Git UI, and capability scan. |
-| Pi packages, extensions, skills, and prompts | Exclude Electron host implementations | Existing CLI/package commands and extension UI | ADAPT | P1 | Medium | Phase 7 real list/install/remove/update flows. |
+| Pi packages, extensions, skills, prompts, and themes | Exclude Electron host implementations | Existing CLI/package commands and extension UI concepts | ADAPT | P2 | Medium | Phase 7 typed bridge tests, isolated real Pi mutation gate, live `get_commands`, and Windows UI verification. |
 | Managed Pi runtime and release packaging | Bundled-tool concepts only | Existing Tauri sidecar discovery | DEFER | P2 | High | Phase 8 clean-machine install and upgrade gate. |
 | Electron main, preload, and agent host | `src/main`, `src/preload`, `src/agent-host` | None | DROP | P0 | Low | Static scan contains no Electron dependency or host bootstrap. |
 | Browser Agent and Channels | Browser and Channels trees | None | DROP | P0 | Low | Static scan contains no Browser Agent or Channels source. |
 
 Phase 6 adds a lazy xterm surface backed by a managed native PTY, typed Git status and bounded diffs, and guarded worktree list/create/use/remove flows. It removes the inherited arbitrary Git command and broad renderer shell process capabilities. It does not add stage/commit/fetch/push/reset, force worktree deletion, an unrestricted destination picker, a complete IDE, package management, a managed runtime, Browser Agent, Channels, or mock Pi behavior.
+
+Phase 7 adds typed Pi package list/install/remove/update commands, live extension/plugin/skill/prompt discovery through each session's Pi RPC runtime, direct theme visibility, and command-to-composer staging. Pi remains the package-policy owner. It does not add a package marketplace, recommendations, package-specific settings, automatic command execution, a duplicate `pi config` implementation, managed runtime updates, Browser Agent, Channels, or mock ecosystem data.

@@ -1,118 +1,97 @@
 # Pi CLI → Pi Desktop Feature Mapping
 
-This document maps `pi-mono/packages/coding-agent` capabilities to this Tauri desktop app (`pi-desktop`).
+This document describes the code that exists on `feat/tauri-react-migration` after Phase 7. It intentionally does not count inherited Gustav UI claims that are not present in the React renderer.
 
-## 1) Foundation / Architecture
+## Foundation
 
-| CLI capability | Desktop mapping |
-|---|---|
-| `pi --mode rpc` JSON protocol | ✅ Core transport used by app (`src/rpc/bridge.ts` + Rust process manager) |
-| Cross-platform binary/process execution | ✅ Tauri Rust backend discovers `pi` via dev path → bundled sidecar → PATH |
-| Native-like custom frame | ✅ Custom draggable titlebar + native window controls |
-| Session files in `~/.pi/agent/sessions` | ✅ Indexed via Rust backend (`list_sessions`) for sidebar/session browser |
+| Pi capability | Desktop status |
+| --- | --- |
+| `pi --mode rpc` JSONL protocol | ✅ Rust owns one process per loaded session; the React `PiAdapter` correlates strict LF-delimited requests and events. |
+| Pi discovery | ✅ Bundled sidecar → PATH/common locations, with an explicit settings/environment override supported by the existing native runtime. |
+| Process lifecycle | ✅ RPC, terminal, and package-operation children are owned and stopped on window/application exit. |
+| Electron host/preload | ❌ Deliberately absent. Tauri commands are the native boundary. |
 
-## 2) Chat + Agent Loop
+## Chat and Agent Loop
 
-| CLI capability | Desktop mapping |
-|---|---|
-| Prompting (`prompt`) | ✅ Main composer send action |
-| Streaming assistant deltas (`message_update`) | ✅ Live markdown stream with cursor |
-| Tool call lifecycle (`tool_execution_*`) | ✅ Collapsible per-tool blocks + streaming output |
-| Thinking deltas | ✅ Collapsible thinking blocks, global toggle |
-| Abort (`abort`) | ✅ Esc / Stop button |
-| Message-level UX actions | ✅ Per-message copy / edit / retry hover actions |
-| Auto-compaction events | ✅ Status pill + toast notifications |
-| Auto-retry events | ✅ Retry status pill + error toast |
+| Pi capability | Desktop status |
+| --- | --- |
+| Prompt / steer / follow-up | ✅ Real RPC requests from the composer. |
+| Delta-only assistant text and thinking | ✅ Normalized and reconciled with authoritative message-end data. |
+| Tool lifecycle and output | ✅ Rendered from real tool start/update/end events. |
+| Abort and settled state | ✅ Stop uses Pi RPC and waits for the actual settled event. |
+| Images | ✅ PNG/JPEG/WebP/GIF picker, paste, and drop payloads use Pi's native image shape. |
+| Extension custom UI dialogs/widgets | ⏸️ Not integrated in the React renderer. The inherited native response command is not presented as a completed feature. |
 
-## 3) Models, Thinking, Queueing
+## Sessions
 
-| CLI capability | Desktop mapping |
-|---|---|
-| `get_available_models` + `set_model` + `cycle_model` | ✅ Model dropdown + Ctrl/Cmd+M quick cycle |
-| `set_thinking_level` + `cycle_thinking_level` | ✅ Thinking dropdown + Shift+Tab cycle |
-| Message queue semantics (`steer`, `follow_up`) | ✅ Enter=steer while streaming, Alt+Enter=follow-up |
-| Queue mode config (`set_steering_mode`, `set_follow_up_mode`) | ✅ Settings panel controls |
-| Pending queue count | ✅ Titlebar/session state indicators |
+| Pi capability | Desktop status |
+| --- | --- |
+| List workspace sessions | ✅ Native bounded JSONL index filtered to the selected workspace. |
+| New / switch / resume | ✅ Separate session-owned Pi RPC runtimes. |
+| Rename / delete | ✅ Real Pi rename plus guarded deletion inside the Pi sessions directory. |
+| Fork | ✅ Real fork-point query and fork with composer restoration. |
+| Rapid selection | ✅ Latest selection wins; per-session messages and model state remain isolated. |
+| Export, stats, tree/history overlays | ⏸️ Not migrated yet. |
 
-## 4) Sessions
+## Models and Authentication
 
-| CLI capability | Desktop mapping |
-|---|---|
-| New session (`new_session`) | ✅ Toolbar + shortcut + titlebar action |
-| Switch session (`switch_session`) | ✅ Sidebar project sessions + session browser |
-| Session naming (`set_session_name`) | ✅ Chat toolbar “Name” action |
-| Session stats (`get_session_stats`) | ✅ Live tokens/cost in titlebar |
-| Fork (`get_fork_messages` + `fork`) | ✅ Fork picker UI in chat + session browser |
-| Export HTML (`export_html`) | ✅ Export + open file + copy exported HTML |
-| Session message history inspection (`get_messages`) | ✅ History overlay with search/filter/reveal/copy/edit |
+| Pi capability | Desktop status |
+| --- | --- |
+| Available models / set model | ✅ Live per-session RPC catalog and switching. |
+| Thinking levels | ✅ Live supported-level query and per-session change. |
+| Credential visibility | ✅ Metadata only: provider, source, and credential kind. Secrets are never serialized to the WebView. |
+| Remove provider credential | ✅ Explicitly confirmed, provider-scoped native edit with malformed-file preservation. |
+| Interactive `/login` | ⚠️ Pi 0.84.2 does not expose it over RPC; Desktop gives guidance and does not add a Node auth host. |
 
-## 5) Command/Resource Discoverability
+## Workspace Files
 
-| CLI capability | Desktop mapping |
-|---|---|
-| `get_commands` (extensions/prompts/skills) | ✅ Command palette with search + execute |
-| Extension/prompt/skill visibility | ✅ Extensions panel grouped by source |
-| Sidebar project context | ✅ Persisted projects + per-project session list |
+| Capability | Desktop status |
+| --- | --- |
+| Browse and index | ✅ Workspace-relative native commands skip generated directories and symlinks. |
+| Preview and edit | ✅ Existing UTF-8 text files up to 1 MiB, with stale-content conflict protection. |
+| `@file` composer insertion | ✅ Quoted paths and ranked completion. |
+| General filesystem access | ❌ No recursive home-directory permission or direct renderer filesystem plugin. |
 
-## 5b) Package Management
+## Terminal, Git, and Worktrees
 
-| CLI capability | Desktop mapping |
-|---|---|
-| `pi install/remove/update/list` | ✅ Desktop package manager tab executes real CLI commands via backend (`run_pi_cli_command`) |
-| Global vs local install scopes (`-l`) | ✅ Scope toggle in package manager UI |
+| Capability | Desktop status |
+| --- | --- |
+| Terminal | ✅ Lazy xterm renderer backed by an owned native PTY. |
+| Git status and diff | ✅ Typed native commands with bounded diff output. |
+| Worktree list/create/use/remove | ✅ Adjacent destinations and guards for main/current/dirty/locked/prunable worktrees. |
+| Arbitrary Git or shell command bridge | ❌ Deliberately absent. |
+| Stage/commit/fetch/push/reset | ⏸️ Not part of the current coding-workflow subset. |
 
-## 6) Extension UI Protocol
+## Pi Ecosystem
 
-| CLI capability | Desktop mapping |
-|---|---|
-| `extension_ui_request` dialog methods | ✅ select/confirm/input/editor overlays |
-| notify/status/widget/title fire-and-forget methods | ✅ implemented in handler |
-| `set_editor_text` | ✅ wired to chat composer prefill |
-| `extension_ui_response` | ✅ sent via `rpc_ui_response` bridge helper |
+| Pi capability | Desktop status |
+| --- | --- |
+| `pi list` | ✅ Typed native command parses Pi's output. User packages are visible by default; project packages require an explicit trust confirmation before Pi is called with `--approve`. |
+| `pi install` | ✅ User/project scopes with an explicit full-system-access warning. Local sources must resolve inside the selected workspace. |
+| `pi remove` | ✅ Exact source and scope from the listed package, with explicit confirmation. |
+| `pi update --extensions` | ✅ Explicitly confirmed update through Pi; project packages are included only after project trust approval, and pinned-package behavior remains Pi-owned. |
+| Extensions / plugins | ✅ Current invokable commands come from the active runtime's real `get_commands` response. Pi represents plugin behavior as extensions. |
+| Skills | ✅ Real `/skill:name` commands grouped from `get_commands/sourceInfo`. |
+| Prompt templates | ✅ Real prompt commands grouped from `get_commands/sourceInfo`. |
+| Command use | ✅ Stages `/<name>` in the composer; never executes automatically. |
+| Themes | ✅ Pi built-in `dark`/`light` plus direct user/project `themes/*.json`. Package-owned themes remain managed and represented by their package. |
+| Package gallery, recommendations, search | ❌ Not copied from Gustav; discovery/recommendation policy is not duplicated in Desktop core. |
+| Resource enable/disable (`pi config`) | ⚠️ Remains Pi's interactive TUI mechanism; Desktop does not rewrite its package/filter/trust policy. |
 
-## 7) Media / Attachments
+Package operations are serialized, capped at 512 KiB of captured output, limited to 120 seconds, and cleaned up with the application. The WebView cannot supply arbitrary Pi arguments, environment variables, working directories, or executable paths.
 
-| CLI capability | Desktop mapping |
-|---|---|
-| Prompt images (`images` on prompt/steer/follow_up) | ✅ Attach image button, drag-drop, clipboard paste |
-| Inline attachment display in user messages | ✅ Thumbnail chips in chat |
+## Desktop Shell
 
-## 8) Settings + Theming
+| Capability | Desktop status |
+| --- | --- |
+| React 19 shell | ✅ Warm paper design with light/dark persistence. |
+| Native titlebar controls | ✅ Drag, minimize, maximize/restore, and close. |
+| Rust runtime proof | ✅ Platform, architecture, and version are displayed from Tauri. |
+| Browser Agent / Channels | ❌ Explicitly dropped from this product boundary. |
 
-| CLI capability | Desktop mapping |
-|---|---|
-| Theme switching | ✅ Dark/light runtime toggle + persisted local setting |
-| Auto-compaction toggle | ✅ Settings panel |
-| Auto-retry toggle | ✅ Settings panel |
-| Queue mode settings | ✅ Settings panel |
-| Auth/account visibility | ✅ Settings panel inspects `auth.json` + known provider env vars |
-| CLI update visibility | ✅ Settings panel compares local CLI version vs npm latest and offers in-app update (PATH installs) |
-| RPC compatibility verification | ✅ Startup and settings-triggered compatibility probes (`get_state` / `get_commands` / `get_available_models`) |
-| Update discoverability UX | ✅ Titlebar badge/button appears when CLI update is available |
+## Deferred to Phase 8
 
-## 9) Keyboard Shortcuts (Desktop)
-
-Implemented shortcuts include:
-- `Ctrl/Cmd+N` new session
-- `Ctrl/Cmd+L` focus composer
-- `Esc` abort
-- `Ctrl/Cmd+M` cycle model
-- `Shift+Tab` cycle thinking
-- `Ctrl/Cmd+T` toggle thinking blocks
-- `Ctrl/Cmd+K` / `Ctrl/Cmd+P` command palette
-- `Ctrl/Cmd+R` session browser
-- `Ctrl/Cmd+Shift+H` session history viewer
-- `Ctrl/Cmd+,` settings
-- `Ctrl/Cmd+Shift+C` copy last assistant message
-- `Ctrl/Cmd+E` export HTML
-- `Ctrl/Cmd+Shift+E` copy exported HTML
-- `Ctrl/Cmd+Shift+T` toggle theme
-
-## 10) Known RPC-mode Limits (CLI features that require interactive TUI)
-
-Some CLI interactive commands/components are not exposed by RPC itself (per `docs/rpc.md`), so they are not 1:1 reproducible unless implemented through custom extensions or a non-RPC embedding:
-- Built-in interactive-only slash UIs like `/login`, `/settings`, `/tree` TUI selectors
-- Full custom TUI component rendering from interactive mode
-- Certain direct editor/TUI behaviors that rely on terminal-native primitives
-
-The desktop app covers the RPC-exposed feature set and adds desktop-native UX on top.
+- Managed Pi runtime installation and ownership.
+- Correct fork-aware Pi package identity and self-update behavior.
+- Clean-machine packaging, upgrades, rollback, and release verification.
+- Final product branding/versioning.

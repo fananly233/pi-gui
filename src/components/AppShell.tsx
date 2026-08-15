@@ -3,6 +3,7 @@ import type { DesktopRuntimeInfo } from "../api/desktop-api";
 import type { PiChatController } from "../hooks/usePiChat";
 import { applyTheme, readStoredTheme, storeTheme, type Theme } from "../theme";
 import { ChatWindow } from "./ChatWindow";
+import { EcosystemPanel } from "./EcosystemPanel";
 import { FilesPanel } from "./FilesPanel";
 import { GitPanel } from "./GitPanel";
 import { SessionSidebar } from "./SessionSidebar";
@@ -25,7 +26,7 @@ type AppShellProps = {
 	chat: PiChatController;
 };
 
-export type WorkspaceTool = "files" | "git" | "terminal";
+export type WorkspaceTool = "files" | "git" | "terminal" | "ecosystem";
 
 function RuntimePanel({ state, onRetry }: { state: RuntimeState; onRetry: () => Promise<void> }) {
 	if (state.status === "loading") return <span>Checking Rust bridge…</span>;
@@ -82,6 +83,11 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 
 	const mentionFile = (path: string) => {
 		setFileMentionSeed({ id: ++fileMentionSequence.current, path });
+	};
+
+	const useEcosystemCommand = (command: string) => {
+		chat.stageComposerText(command);
+		setActiveTool(null);
 	};
 
 	return (
@@ -198,6 +204,15 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 						<Suspense fallback={<aside className="workspace-tool-panel terminal-panel"><div className="tool-panel__empty">Loading terminal…</div></aside>}>
 							<TerminalPanel workspaceRoot={workspaceRoot} theme={theme} onClose={() => setActiveTool(null)} />
 						</Suspense>
+					) : null}
+					{activeTool === "ecosystem" ? (
+						<EcosystemPanel
+							workspaceRoot={workspaceRoot}
+							sessionReady={chat.sessionReady}
+							loadCommands={chat.loadEcosystemCommands}
+							onUseCommand={useEcosystemCommand}
+							onClose={() => setActiveTool(null)}
+						/>
 					) : null}
 				</main>
 			</div>

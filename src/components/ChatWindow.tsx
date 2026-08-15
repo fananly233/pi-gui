@@ -93,6 +93,10 @@ export function ChatWindow(props: ChatWindowProps) {
 						<span aria-hidden="true">›_</span>
 						Terminal
 					</button>
+					<button type="button" className={`workspace-tool-trigger${props.activeTool === "ecosystem" ? " is-active" : ""}`} onClick={() => props.onToggleTool("ecosystem")} data-testid="ecosystem-button">
+						<span aria-hidden="true">◇</span>
+						Ecosystem
+					</button>
 					<button type="button" className="model-trigger" data-testid="models-auth-button" onClick={() => setModelsOpen(true)}>
 						<span>Model</span>
 						<strong>{props.model?.name ?? "Models & auth"}</strong>
