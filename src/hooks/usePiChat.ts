@@ -4,6 +4,7 @@ import type { ChatActivity, ChatDelivery, ChatImageAttachment, ChatMessage, PiCo
 import { EventNormalizer, type NormalizedPiEvent } from "../pi/event-normalizer";
 import type { PiModelConfiguration, PiModelInfo, PiThinkingLevel } from "../models/model-state";
 import { PiAdapter, type PiAdapterEvent, type PiForkOption, type PiImageInput } from "../pi/pi-adapter";
+import type { PiCommandInfo } from "../pi/ecosystem";
 import { parseSessionMessages } from "../sessions/session-message-parser";
 import {
 	SessionSelectionGuard,
@@ -642,6 +643,24 @@ export function usePiChat() {
 		return { models, currentModel: state.model, thinkingLevel: state.thinkingLevel, thinkingLevels };
 	}, [updateRuntime]);
 
+	const loadEcosystemCommands = useCallback(async (): Promise<PiCommandInfo[]> => {
+		const key = selection.current.activeKey;
+		const record = key ? runtimesRef.current.get(key) : null;
+		if (!key || !record || record.snapshot.phase !== "ready" || !record.adapter.isConnected) {
+			throw new Error("Select a ready Pi session before discovering extensions, skills, and prompts.");
+		}
+		const commands = await record.adapter.getCommands();
+		if (runtimesRef.current.get(key) !== record || selection.current.activeKey !== key) {
+			throw new Error("The active session changed while discovering Pi resources.");
+		}
+		return commands;
+	}, []);
+
+	const stageComposerText = useCallback((text: string) => {
+		if (!text.trim()) return;
+		setComposerSeed({ id: ++composerSequence.current, text });
+	}, []);
+
 	const setModel = useCallback(async (model: PiModelInfo) => {
 		const key = selection.current.activeKey;
 		const record = key ? runtimesRef.current.get(key) : null;
@@ -836,6 +855,8 @@ export function usePiChat() {
 		loadForkOptions,
 		forkSession,
 		loadModelConfiguration,
+		loadEcosystemCommands,
+		stageComposerText,
 		setModel,
 		setThinkingLevel,
 		send,

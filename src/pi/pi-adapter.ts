@@ -8,6 +8,7 @@ import {
 	type PiModelInfo,
 	type PiThinkingLevel,
 } from "../models/model-state";
+import { normalizePiCommands, type PiCommandInfo } from "./ecosystem";
 import type { JsonObject } from "./event-normalizer";
 
 export type StreamingBehavior = "steer" | "followUp";
@@ -230,6 +231,11 @@ export class PiAdapter {
 
 	getMessages(): Promise<JsonObject[]> {
 		return this.request<{ messages: JsonObject[] }>({ type: "get_messages" }).then((data) => data.messages);
+	}
+
+	getCommands(): Promise<PiCommandInfo[]> {
+		return this.request<{ commands?: unknown }>({ type: "get_commands" })
+			.then((data) => normalizePiCommands(data.commands));
 	}
 
 	switchSession(sessionPath: string): Promise<{ cancelled: boolean }> {

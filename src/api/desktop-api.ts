@@ -63,6 +63,36 @@ export type PiProviderAuthClearResult = Readonly<{
 	source: string;
 }>;
 
+export type PiPackageScope = "user" | "project";
+
+export type PiPackageInfo = Readonly<{
+	source: string;
+	scope: PiPackageScope;
+	installedPath: string | null;
+	filtered: boolean;
+}>;
+
+type NativePiPackageInfo = Readonly<{
+	source: string;
+	scope: PiPackageScope;
+	installed_path: string | null;
+	filtered: boolean;
+}>;
+
+type NativePiPackageListResult = Readonly<{
+	packages: NativePiPackageInfo[];
+}>;
+
+export type PiPackageMutationResult = Readonly<{
+	message: string;
+}>;
+
+export type PiThemeInfo = Readonly<{
+	name: string;
+	path: string | null;
+	scope: "builtin" | "user" | "project";
+}>;
+
 export type WorkspaceEntry = Readonly<{
 	name: string;
 	path: string;
@@ -249,6 +279,32 @@ export const desktopApi = {
 
 	clearPiProviderAuth(provider: string): Promise<PiProviderAuthClearResult> {
 		return invoke<PiProviderAuthClearResult>("clear_pi_provider_auth", { provider });
+	},
+
+	async listPiPackages(workspaceRoot: string, approveProject = false): Promise<PiPackageInfo[]> {
+		const result = await invoke<NativePiPackageListResult>("list_pi_packages", { workspaceRoot, approveProject });
+		return result.packages.map((entry) => ({
+			source: entry.source,
+			scope: entry.scope,
+			installedPath: entry.installed_path,
+			filtered: entry.filtered,
+		}));
+	},
+
+	installPiPackage(workspaceRoot: string, source: string, scope: PiPackageScope): Promise<PiPackageMutationResult> {
+		return invoke<PiPackageMutationResult>("install_pi_package", { workspaceRoot, source, scope });
+	},
+
+	removePiPackage(workspaceRoot: string, source: string, scope: PiPackageScope): Promise<PiPackageMutationResult> {
+		return invoke<PiPackageMutationResult>("remove_pi_package", { workspaceRoot, source, scope });
+	},
+
+	updatePiPackages(workspaceRoot: string, source: string | null = null, approveProject = false): Promise<PiPackageMutationResult> {
+		return invoke<PiPackageMutationResult>("update_pi_packages", { workspaceRoot, source, approveProject });
+	},
+
+	listPiThemes(workspaceRoot: string): Promise<PiThemeInfo[]> {
+		return invoke<PiThemeInfo[]>("list_pi_themes", { workspaceRoot });
 	},
 
 	async chooseWorkspace(): Promise<string | null> {

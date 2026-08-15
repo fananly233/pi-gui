@@ -23,7 +23,8 @@
 		"test": "node --experimental-strip-types --test tests/*.test.mjs",
 		"gate:pi-real": "node --experimental-strip-types scripts/real-pi-rpc-gate.mjs",
 		"gate:sessions-real": "node scripts/real-pi-session-gate.mjs",
-		"gate:models-real": "node scripts/real-pi-model-gate.mjs"
+		"gate:models-real": "node scripts/real-pi-model-gate.mjs",
+		"gate:ecosystem-real": "node scripts/real-pi-ecosystem-gate.mjs"
 	},
 	"dependencies": {
 		"@tauri-apps/api": "^2.0.0",

@@ -4,13 +4,17 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, Instant, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 
 static TERMINAL_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+const MAX_PI_PACKAGE_OUTPUT_BYTES: usize = 512 * 1024;
+const MAX_PI_PACKAGE_SOURCE_BYTES: usize = 512;
+const MAX_PI_THEME_BYTES: u64 = 256 * 1024;
+const PI_PACKAGE_TIMEOUT: Duration = Duration::from_secs(120);
 
 #[cfg(target_os = "windows")]
 fn terminate_windows_process_tree(pid: u32) {
@@ -140,6 +144,41 @@ impl Drop for TerminalState {
                 stop_terminal_instance(&mut handle);
             }
         }
+    }
+}
+
+pub struct PiPackageState {
+    operation: tokio::sync::Mutex<()>,
+    active_child: Arc<Mutex<Option<Child>>>,
+}
+
+impl Default for PiPackageState {
+    fn default() -> Self {
+        Self {
+            operation: tokio::sync::Mutex::new(()),
+            active_child: Arc::new(Mutex::new(None)),
+        }
+    }
+}
+
+fn stop_pi_package_process(child: &mut Child) {
+    #[cfg(target_os = "windows")]
+    terminate_windows_process_tree(child.id());
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+fn stop_pi_package_child(active_child: &Arc<Mutex<Option<Child>>>) {
+    if let Ok(mut active) = active_child.lock() {
+        if let Some(mut child) = active.take() {
+            stop_pi_package_process(&mut child);
+        }
+    }
+}
+
+impl Drop for PiPackageState {
+    fn drop(&mut self) {
+        stop_pi_package_child(&self.active_child);
     }
 }
 
@@ -344,7 +383,11 @@ fn discover_pi_from_common_locations() -> Option<PathBuf> {
         }
 
         if let Ok(program_files_x86) = std::env::var("ProgramFiles(x86)") {
-            candidates.push(PathBuf::from(program_files_x86).join("nodejs").join("pi.cmd"));
+            candidates.push(
+                PathBuf::from(program_files_x86)
+                    .join("nodejs")
+                    .join("pi.cmd"),
+            );
         }
 
         if let Ok(program_data) = std::env::var("ProgramData") {
@@ -864,10 +907,16 @@ async fn rpc_send(
             if let Some(ref mut stdin) = handle.stdin_writer {
                 write_rpc_line(stdin, &command)
             } else {
-                Err(format!("RPC process not started for instance '{}'", instance_id))
+                Err(format!(
+                    "RPC process not started for instance '{}'",
+                    instance_id
+                ))
             }
         } else {
-            Err(format!("RPC process not started for instance '{}'", instance_id))
+            Err(format!(
+                "RPC process not started for instance '{}'",
+                instance_id
+            ))
         }
     } else {
         Err("Failed to acquire RPC instances lock".to_string())
@@ -876,7 +925,10 @@ async fn rpc_send(
 
 /// Stop an RPC process instance
 #[tauri::command]
-async fn rpc_stop(state: tauri::State<'_, RpcState>, instance_id: Option<String>) -> Result<(), String> {
+async fn rpc_stop(
+    state: tauri::State<'_, RpcState>,
+    instance_id: Option<String>,
+) -> Result<(), String> {
     let instance_id = normalize_instance_id(instance_id);
     if let Ok(mut instances) = state.instances.lock() {
         if let Some(mut handle) = instances.remove(&instance_id) {
@@ -903,7 +955,10 @@ async fn rpc_stop_all(state: tauri::State<'_, RpcState>) -> Result<(), String> {
 
 /// Check if an RPC process instance is running
 #[tauri::command]
-async fn rpc_is_running(state: tauri::State<'_, RpcState>, instance_id: Option<String>) -> Result<bool, String> {
+async fn rpc_is_running(
+    state: tauri::State<'_, RpcState>,
+    instance_id: Option<String>,
+) -> Result<bool, String> {
     let instance_id = normalize_instance_id(instance_id);
     if let Ok(mut instances) = state.instances.lock() {
         if let Some(handle) = instances.get_mut(&instance_id) {
@@ -941,10 +996,16 @@ async fn rpc_ui_response(
             if let Some(ref mut stdin) = handle.stdin_writer {
                 write_rpc_line(stdin, &response)
             } else {
-                Err(format!("RPC process not started for instance '{}'", instance_id))
+                Err(format!(
+                    "RPC process not started for instance '{}'",
+                    instance_id
+                ))
             }
         } else {
-            Err(format!("RPC process not started for instance '{}'", instance_id))
+            Err(format!(
+                "RPC process not started for instance '{}'",
+                instance_id
+            ))
         }
     } else {
         Err("Failed to acquire RPC instances lock".to_string())
@@ -2123,7 +2184,10 @@ fn package_extension_entry_files(package_root: &Path) -> Vec<PathBuf> {
                         let Some(raw) = entry.as_str() else {
                             continue;
                         };
-                        let normalized = raw.trim().trim_start_matches("./").trim_start_matches(".\\");
+                        let normalized = raw
+                            .trim()
+                            .trim_start_matches("./")
+                            .trim_start_matches(".\\");
                         if normalized.is_empty() {
                             continue;
                         }
@@ -2138,7 +2202,14 @@ fn package_extension_entry_files(package_root: &Path) -> Vec<PathBuf> {
     }
 
     if files.is_empty() {
-        for fallback in ["index.ts", "index.js", "src/index.ts", "src/index.js", "src/index.mjs", "index.mjs"] {
+        for fallback in [
+            "index.ts",
+            "index.js",
+            "src/index.ts",
+            "src/index.js",
+            "src/index.mjs",
+            "index.mjs",
+        ] {
             let candidate = package_root.join(fallback);
             if candidate.is_file() {
                 files.push(candidate);
@@ -2294,7 +2365,10 @@ fn extract_oauth_providers_from_package(package_root: &Path) -> Vec<PiOAuthProvi
 #[tauri::command]
 async fn get_pi_oauth_providers(app: AppHandle) -> Result<Vec<PiOAuthProviderInfo>, String> {
     let mut providers = builtin_oauth_provider_info();
-    let mut seen: HashSet<String> = providers.iter().map(|provider| provider.id.clone()).collect();
+    let mut seen: HashSet<String> = providers
+        .iter()
+        .map(|provider| provider.id.clone())
+        .collect();
 
     let discovery_opts = RpcStartOptions {
         cli_path: None,
@@ -2313,8 +2387,6 @@ async fn get_pi_oauth_providers(app: AppHandle) -> Result<Vec<PiOAuthProviderInf
         args: vec!["list".to_string()],
         cwd: Some(".".to_string()),
         env: None,
-        cli_path: None,
-        pi_path: None,
     };
 
     let output = match build_plain_command(&pi, &list_opts).output() {
@@ -2432,16 +2504,53 @@ struct PiCliCommandOptions {
     args: Vec<String>,
     cwd: Option<String>,
     env: Option<std::collections::HashMap<String, String>>,
-    cli_path: Option<String>,
-    pi_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum PiPackageScope {
+    User,
+    Project,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+struct PiPackageInfo {
+    source: String,
+    scope: PiPackageScope,
+    installed_path: Option<String>,
+    filtered: bool,
 }
 
 #[derive(Debug, Serialize)]
-struct PiCliCommandResult {
+struct PiPackageListResult {
+    packages: Vec<PiPackageInfo>,
+}
+
+#[derive(Debug, Serialize)]
+struct PiPackageMutationResult {
+    message: String,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+struct PiThemeInfo {
+    name: String,
+    path: Option<String>,
+    scope: PiThemeScope,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+enum PiThemeScope {
+    Builtin,
+    User,
+    Project,
+}
+
+struct PiPackageCommandOutput {
+    status: ExitStatus,
     stdout: String,
     stderr: String,
-    exit_code: i32,
-    discovery: String,
+    truncated: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2557,10 +2666,18 @@ fn discover_gh_path() -> Option<PathBuf> {
             candidates.push(PathBuf::from(&app_data).join("npm").join("gh.cmd"));
         }
         if let Ok(program_files) = std::env::var("ProgramFiles") {
-            candidates.push(PathBuf::from(program_files).join("GitHub CLI").join("gh.exe"));
+            candidates.push(
+                PathBuf::from(program_files)
+                    .join("GitHub CLI")
+                    .join("gh.exe"),
+            );
         }
         if let Ok(program_files_x86) = std::env::var("ProgramFiles(x86)") {
-            candidates.push(PathBuf::from(program_files_x86).join("GitHub CLI").join("gh.exe"));
+            candidates.push(
+                PathBuf::from(program_files_x86)
+                    .join("GitHub CLI")
+                    .join("gh.exe"),
+            );
         }
     }
 
@@ -2584,7 +2701,9 @@ fn parse_gist_url_from_output(output: &str) -> Option<String> {
             continue;
         };
         let mut url = token[start..]
-            .trim_matches(|c: char| c == '"' || c == '\'' || c == '`' || c == '(' || c == '[' || c == '{')
+            .trim_matches(|c: char| {
+                c == '"' || c == '\'' || c == '`' || c == '(' || c == '[' || c == '{'
+            })
             .to_string();
 
         while let Some(last) = url.chars().last() {
@@ -2604,7 +2723,10 @@ fn parse_gist_url_from_output(output: &str) -> Option<String> {
 
 fn parse_gist_id_from_url(url: &str) -> Option<String> {
     let clean = url.trim().trim_end_matches('/');
-    let parts: Vec<&str> = clean.split('/').filter(|entry| !entry.trim().is_empty()).collect();
+    let parts: Vec<&str> = clean
+        .split('/')
+        .filter(|entry| !entry.trim().is_empty())
+        .collect();
     let gist_id = parts.last()?.trim();
     if gist_id.len() < 20 {
         return None;
@@ -2670,8 +2792,6 @@ fn get_current_pi_version(pi: &PiProcess, options: &CliStatusOptions) -> Option<
         args: vec!["--version".to_string()],
         cwd: options.cwd.clone(),
         env: options.env.clone(),
-        cli_path: options.cli_path.clone(),
-        pi_path: options.pi_path.clone(),
     };
 
     let output = build_plain_command(pi, &version_opts).output().ok()?;
@@ -2688,7 +2808,11 @@ fn get_latest_npm_cli_version(pi: Option<&PiProcess>) -> (bool, Option<String>, 
     let npm_path = match discover_npm_path(pi) {
         Some(path) => path,
         None => {
-            return (false, None, Some("npm not found on PATH/common locations".to_string()));
+            return (
+                false,
+                None,
+                Some("npm not found on PATH/common locations".to_string()),
+            );
         }
     };
 
@@ -2791,43 +2915,498 @@ fn build_plain_command(pi: &PiProcess, options: &PiCliCommandOptions) -> Command
     cmd
 }
 
-/// Run a regular pi CLI command (e.g. package operations: list/install/remove/update)
-#[tauri::command]
-async fn run_pi_cli_command(
-    app: AppHandle,
-    options: PiCliCommandOptions,
-) -> Result<PiCliCommandResult, String> {
-    if options.args.is_empty() {
-        return Err("No command arguments provided".to_string());
+fn read_capped_pi_output<R: Read>(mut reader: R) -> (Vec<u8>, bool) {
+    let mut output = Vec::new();
+    let mut buffer = [0_u8; 8192];
+    let mut truncated = false;
+    loop {
+        let count = match reader.read(&mut buffer) {
+            Ok(0) | Err(_) => break,
+            Ok(count) => count,
+        };
+        let remaining = MAX_PI_PACKAGE_OUTPUT_BYTES.saturating_sub(output.len());
+        if remaining > 0 {
+            output.extend_from_slice(&buffer[..count.min(remaining)]);
+        }
+        truncated |= count > remaining;
+    }
+    (output, truncated)
+}
+
+fn run_managed_pi_package_command(
+    mut command: Command,
+    active_child: Arc<Mutex<Option<Child>>>,
+) -> Result<PiPackageCommandOutput, String> {
+    let mut child = command
+        .spawn()
+        .map_err(|e| format!("Could not start the Pi package command: {}", e))?;
+    let Some(stdout) = child.stdout.take() else {
+        stop_pi_package_process(&mut child);
+        return Err("Pi package command stdout was unavailable".to_string());
+    };
+    let Some(stderr) = child.stderr.take() else {
+        stop_pi_package_process(&mut child);
+        return Err("Pi package command stderr was unavailable".to_string());
+    };
+    {
+        let mut active = match active_child.lock() {
+            Ok(active) => active,
+            Err(_) => {
+                stop_pi_package_process(&mut child);
+                return Err("Pi package process state is unavailable".to_string());
+            }
+        };
+        if active.is_some() {
+            stop_pi_package_process(&mut child);
+            return Err("Another Pi package command is already running".to_string());
+        }
+        *active = Some(child);
     }
 
-    let resolved_cwd = options.cwd.clone().unwrap_or_else(|| ".".to_string());
-    if !Path::new(&resolved_cwd).is_dir() {
-        return Err(format!("Working directory does not exist: {}", resolved_cwd));
-    }
-
-    let discovery_opts = RpcStartOptions {
-        cli_path: options.cli_path.clone(),
-        pi_path: options.pi_path.clone(),
-        cwd: resolved_cwd,
-        provider: None,
-        model: None,
-        env: options.env.clone(),
+    let stdout_reader = std::thread::spawn(move || read_capped_pi_output(stdout));
+    let stderr_reader = std::thread::spawn(move || read_capped_pi_output(stderr));
+    let deadline = Instant::now() + PI_PACKAGE_TIMEOUT;
+    let status = loop {
+        let poll = {
+            let mut active = active_child
+                .lock()
+                .map_err(|_| "Pi package process state is unavailable".to_string())?;
+            match active.as_mut() {
+                Some(child) => child
+                    .try_wait()
+                    .map_err(|e| format!("Could not poll the Pi package command: {}", e))?,
+                None => break Err("Pi package command was stopped".to_string()),
+            }
+        };
+        if let Some(status) = poll {
+            if let Ok(mut active) = active_child.lock() {
+                active.take();
+            }
+            break Ok(status);
+        }
+        if Instant::now() >= deadline {
+            stop_pi_package_child(&active_child);
+            break Err(format!(
+                "Pi package command timed out after {} seconds",
+                PI_PACKAGE_TIMEOUT.as_secs()
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(50));
     };
 
-    let pi = discover_pi(&app, &discovery_opts)?;
-    let discovery_label = format!("{:?}", pi);
+    let (stdout, stdout_truncated) = stdout_reader
+        .join()
+        .map_err(|_| "Could not collect Pi package stdout".to_string())?;
+    let (stderr, stderr_truncated) = stderr_reader
+        .join()
+        .map_err(|_| "Could not collect Pi package stderr".to_string())?;
+    let status = status?;
 
-    let output = build_plain_command(&pi, &options)
-        .output()
-        .map_err(|e| format!("Failed to run pi command ({:?}): {}", pi, e))?;
-
-    Ok(PiCliCommandResult {
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        exit_code: output.status.code().unwrap_or(-1),
-        discovery: discovery_label,
+    Ok(PiPackageCommandOutput {
+        status,
+        stdout: String::from_utf8_lossy(&stdout).to_string(),
+        stderr: String::from_utf8_lossy(&stderr).to_string(),
+        truncated: stdout_truncated || stderr_truncated,
     })
+}
+
+fn strip_ansi_sequences(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut output = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == 0x1b && bytes.get(index + 1) == Some(&b'[') {
+            index += 2;
+            while index < bytes.len() {
+                let byte = bytes[index];
+                index += 1;
+                if (0x40..=0x7e).contains(&byte) {
+                    break;
+                }
+            }
+            continue;
+        }
+        output.push(bytes[index]);
+        index += 1;
+    }
+    String::from_utf8_lossy(&output).to_string()
+}
+
+fn parse_pi_package_list(output: &str) -> Vec<PiPackageInfo> {
+    let clean = strip_ansi_sequences(output);
+    let mut scope: Option<PiPackageScope> = None;
+    let mut packages: Vec<PiPackageInfo> = Vec::new();
+    for line in clean.lines() {
+        match line.trim() {
+            "User packages:" => {
+                scope = Some(PiPackageScope::User);
+                continue;
+            }
+            "Project packages:" => {
+                scope = Some(PiPackageScope::Project);
+                continue;
+            }
+            _ => {}
+        }
+        let Some(current_scope) = scope else {
+            continue;
+        };
+        if let Some(path) = line.strip_prefix("    ") {
+            if let Some(package) = packages.last_mut() {
+                let path = path.trim();
+                if !path.is_empty() {
+                    package.installed_path = Some(path.to_string());
+                }
+            }
+            continue;
+        }
+        let Some(source) = line.strip_prefix("  ") else {
+            continue;
+        };
+        let source = source.trim();
+        if source.is_empty() {
+            continue;
+        }
+        let (source, filtered) = source
+            .strip_suffix(" (filtered)")
+            .map(|value| (value.trim_end(), true))
+            .unwrap_or((source, false));
+        packages.push(PiPackageInfo {
+            source: source.to_string(),
+            scope: current_scope,
+            installed_path: None,
+            filtered,
+        });
+    }
+    packages
+}
+
+fn validate_pi_package_source(raw: &str) -> Result<String, String> {
+    let source = raw.trim();
+    if source.is_empty() {
+        return Err("Enter a Pi package source".to_string());
+    }
+    if source.len() > MAX_PI_PACKAGE_SOURCE_BYTES {
+        return Err("Pi package source is too long".to_string());
+    }
+    if source.starts_with('-') || source.chars().any(char::is_control) {
+        return Err("Pi package source contains unsupported characters".to_string());
+    }
+    Ok(source.to_string())
+}
+
+fn validate_pi_install_source(root: &Path, raw: &str) -> Result<String, String> {
+    let source = validate_pi_package_source(raw)?;
+    let remote = source.starts_with("npm:")
+        || source.starts_with("git:")
+        || source.starts_with("https://")
+        || source.starts_with("http://")
+        || source.starts_with("ssh://")
+        || source.starts_with("git://");
+    if remote {
+        if source.chars().any(char::is_whitespace) {
+            return Err("Remote Pi package sources cannot contain whitespace".to_string());
+        }
+        return Ok(source);
+    }
+
+    let requested = PathBuf::from(&source);
+    let candidate = if requested.is_absolute() {
+        requested
+    } else {
+        root.join(requested)
+    };
+    let resolved = ensure_inside_workspace(root, candidate).map_err(|_| {
+        "Local Pi packages must be existing files or directories inside the selected workspace"
+            .to_string()
+    })?;
+    Ok(external_command_path(&resolved)
+        .to_string_lossy()
+        .to_string())
+}
+
+fn describe_pi_package_failure(output: &PiPackageCommandOutput) -> String {
+    let detail = if output.stderr.trim().is_empty() {
+        output.stdout.trim()
+    } else {
+        output.stderr.trim()
+    };
+    let suffix = if output.truncated {
+        " (output truncated)"
+    } else {
+        ""
+    };
+    if detail.is_empty() {
+        format!(
+            "Pi package command failed with exit code {}{}",
+            output.status.code().unwrap_or(-1),
+            suffix
+        )
+    } else {
+        format!("{}{}", detail, suffix)
+    }
+}
+
+fn pi_package_success_message(output: &PiPackageCommandOutput) -> String {
+    let line = output
+        .stdout
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| !line.is_empty())
+        .unwrap_or("Pi package operation completed");
+    if output.truncated {
+        format!("{} (output truncated)", line)
+    } else {
+        line.to_string()
+    }
+}
+
+async fn execute_pi_package_command(
+    app: &AppHandle,
+    state: &PiPackageState,
+    root: &Path,
+    args: Vec<String>,
+) -> Result<PiPackageCommandOutput, String> {
+    let _operation = state.operation.lock().await;
+    let cwd = external_command_path(root).to_string_lossy().to_string();
+    let discovery_options = RpcStartOptions {
+        cli_path: None,
+        pi_path: None,
+        cwd: cwd.clone(),
+        provider: None,
+        model: None,
+        env: None,
+    };
+    let pi = discover_pi(app, &discovery_options)?;
+    let options = PiCliCommandOptions {
+        args,
+        cwd: Some(cwd),
+        env: None,
+    };
+    let command = build_plain_command(&pi, &options);
+    let active_child = Arc::clone(&state.active_child);
+    let output =
+        tokio::task::spawn_blocking(move || run_managed_pi_package_command(command, active_child))
+            .await
+            .map_err(|e| format!("Pi package task failed: {}", e))??;
+    if output.status.success() {
+        Ok(output)
+    } else {
+        Err(describe_pi_package_failure(&output))
+    }
+}
+
+#[tauri::command]
+async fn list_pi_packages(
+    app: AppHandle,
+    state: tauri::State<'_, PiPackageState>,
+    workspace_root: String,
+    approve_project: bool,
+) -> Result<PiPackageListResult, String> {
+    let root = canonical_workspace_root(&workspace_root)?;
+    let trust_flag = if approve_project {
+        "--approve"
+    } else {
+        "--no-approve"
+    };
+    let output = execute_pi_package_command(
+        &app,
+        &state,
+        &root,
+        vec!["list".to_string(), trust_flag.to_string()],
+    )
+    .await?;
+    Ok(PiPackageListResult {
+        packages: parse_pi_package_list(&output.stdout),
+    })
+}
+
+#[tauri::command]
+async fn install_pi_package(
+    app: AppHandle,
+    state: tauri::State<'_, PiPackageState>,
+    workspace_root: String,
+    source: String,
+    scope: PiPackageScope,
+) -> Result<PiPackageMutationResult, String> {
+    let root = canonical_workspace_root(&workspace_root)?;
+    let source = validate_pi_install_source(&root, &source)?;
+    let mut args = vec!["install".to_string(), source];
+    match scope {
+        PiPackageScope::User => args.push("--no-approve".to_string()),
+        PiPackageScope::Project => {
+            args.push("-l".to_string());
+            args.push("--approve".to_string());
+        }
+    }
+    let output = execute_pi_package_command(&app, &state, &root, args).await?;
+    Ok(PiPackageMutationResult {
+        message: pi_package_success_message(&output),
+    })
+}
+
+#[tauri::command]
+async fn remove_pi_package(
+    app: AppHandle,
+    state: tauri::State<'_, PiPackageState>,
+    workspace_root: String,
+    source: String,
+    scope: PiPackageScope,
+) -> Result<PiPackageMutationResult, String> {
+    let root = canonical_workspace_root(&workspace_root)?;
+    let source = validate_pi_package_source(&source)?;
+    let mut args = vec!["remove".to_string(), source];
+    match scope {
+        PiPackageScope::User => args.push("--no-approve".to_string()),
+        PiPackageScope::Project => {
+            args.push("-l".to_string());
+            args.push("--approve".to_string());
+        }
+    }
+    let output = execute_pi_package_command(&app, &state, &root, args).await?;
+    Ok(PiPackageMutationResult {
+        message: pi_package_success_message(&output),
+    })
+}
+
+#[tauri::command]
+async fn update_pi_packages(
+    app: AppHandle,
+    state: tauri::State<'_, PiPackageState>,
+    workspace_root: String,
+    source: Option<String>,
+    approve_project: bool,
+) -> Result<PiPackageMutationResult, String> {
+    let root = canonical_workspace_root(&workspace_root)?;
+    let mut args = vec!["update".to_string()];
+    if let Some(source) = source {
+        args.push("--extension".to_string());
+        args.push(validate_pi_package_source(&source)?);
+    } else {
+        args.push("--extensions".to_string());
+    }
+    args.push(
+        if approve_project {
+            "--approve"
+        } else {
+            "--no-approve"
+        }
+        .to_string(),
+    );
+    let output = execute_pi_package_command(&app, &state, &root, args).await?;
+    Ok(PiPackageMutationResult {
+        message: pi_package_success_message(&output),
+    })
+}
+
+fn collect_direct_pi_themes(
+    directory: &Path,
+    scope: PiThemeScope,
+    workspace_root: Option<&Path>,
+    themes: &mut Vec<PiThemeInfo>,
+) {
+    let Ok(directory_metadata) = fs::symlink_metadata(directory) else {
+        return;
+    };
+    if !directory_metadata.is_dir() || directory_metadata.file_type().is_symlink() {
+        return;
+    }
+    let Ok(entries) = fs::read_dir(directory) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(metadata) = fs::symlink_metadata(&path) else {
+            continue;
+        };
+        if !metadata.is_file()
+            || metadata.file_type().is_symlink()
+            || metadata.len() > MAX_PI_THEME_BYTES
+            || !path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .map(|extension| extension.eq_ignore_ascii_case("json"))
+                .unwrap_or(false)
+        {
+            continue;
+        }
+        let Ok(content) = fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(&content) else {
+            continue;
+        };
+        let name = value
+            .get("name")
+            .and_then(|value| value.as_str())
+            .map(str::trim)
+            .filter(|name| !name.is_empty())
+            .or_else(|| path.file_stem().and_then(|name| name.to_str()))
+            .unwrap_or("unnamed")
+            .to_string();
+        let canonical_path = fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+        let display_path = workspace_root
+            .and_then(|root| canonical_path.strip_prefix(root).ok())
+            .and_then(path_to_workspace_string)
+            .unwrap_or_else(|| {
+                external_command_path(&canonical_path)
+                    .to_string_lossy()
+                    .to_string()
+            });
+        themes.push(PiThemeInfo {
+            name,
+            path: Some(display_path),
+            scope,
+        });
+    }
+}
+
+#[tauri::command]
+async fn list_pi_themes(workspace_root: String) -> Result<Vec<PiThemeInfo>, String> {
+    let root = canonical_workspace_root(&workspace_root)?;
+    let mut themes = vec![
+        PiThemeInfo {
+            name: "dark".to_string(),
+            path: None,
+            scope: PiThemeScope::Builtin,
+        },
+        PiThemeInfo {
+            name: "light".to_string(),
+            path: None,
+            scope: PiThemeScope::Builtin,
+        },
+    ];
+    if let Some(agent_dir) = get_pi_agent_dir() {
+        collect_direct_pi_themes(
+            &agent_dir.join("themes"),
+            PiThemeScope::User,
+            None,
+            &mut themes,
+        );
+    }
+    collect_direct_pi_themes(
+        &root.join(".pi").join("themes"),
+        PiThemeScope::Project,
+        Some(&root),
+        &mut themes,
+    );
+    themes.sort_by(|left, right| {
+        let left_scope = match left.scope {
+            PiThemeScope::Builtin => 0,
+            PiThemeScope::User => 1,
+            PiThemeScope::Project => 2,
+        };
+        let right_scope = match right.scope {
+            PiThemeScope::Builtin => 0,
+            PiThemeScope::User => 1,
+            PiThemeScope::Project => 2,
+        };
+        left_scope
+            .cmp(&right_scope)
+            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+    });
+    Ok(themes)
 }
 
 /// Get current vs latest CLI version and whether in-app update is available.
@@ -2928,10 +3507,7 @@ async fn get_pi_changelog(
 
         match fs::read_to_string(&candidate) {
             Ok(content) => {
-                return Ok(PiChangelogResult {
-                    path: raw,
-                    content,
-                });
+                return Ok(PiChangelogResult { path: raw, content });
             }
             Err(_) => {
                 continue;
@@ -2948,8 +3524,9 @@ async fn get_pi_changelog(
 /// Update globally installed pi CLI via npm.
 #[tauri::command]
 async fn update_cli_via_npm() -> Result<NpmCommandResult, String> {
-    let npm_path = discover_npm_path(None)
-        .ok_or_else(|| "npm was not found on PATH/common locations. Install Node.js/npm first.".to_string())?;
+    let npm_path = discover_npm_path(None).ok_or_else(|| {
+        "npm was not found on PATH/common locations. Install Node.js/npm first.".to_string()
+    })?;
 
     let mut cmd = Command::new(&npm_path);
     cmd.arg("install")
@@ -3467,7 +4044,10 @@ async fn create_share_gist(options: ShareGistOptions) -> Result<ShareGistResult,
 
     let html_path = PathBuf::from(html_path_raw);
     if !html_path.is_file() {
-        return Err(format!("Exported session file not found: {}", html_path_raw));
+        return Err(format!(
+            "Exported session file not found: {}",
+            html_path_raw
+        ));
     }
 
     let gh_path = discover_gh_path().ok_or_else(|| {
@@ -3529,7 +4109,10 @@ async fn create_share_gist(options: ShareGistOptions) -> Result<ShareGistResult,
         } else if !stdout.trim().is_empty() {
             stdout.trim().to_string()
         } else {
-            format!("gh gist create failed with exit code {}", gist_output.status.code().unwrap_or(-1))
+            format!(
+                "gh gist create failed with exit code {}",
+                gist_output.status.code().unwrap_or(-1)
+            )
         };
         return Err(format!("Failed to create gist: {}", message));
     }
@@ -3625,7 +4208,10 @@ async fn open_path_in_default_app(path: String) -> Result<(), String> {
 
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         return Err(if stderr.is_empty() {
-            format!("Could not open file (exit code {})", output.status.code().unwrap_or(-1))
+            format!(
+                "Could not open file (exit code {})",
+                output.status.code().unwrap_or(-1)
+            )
         } else {
             format!("Could not open file: {}", stderr)
         });
@@ -3647,7 +4233,10 @@ async fn open_path_in_default_app(path: String) -> Result<(), String> {
 
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         return Err(if stderr.is_empty() {
-            format!("Could not open file (exit code {})", output.status.code().unwrap_or(-1))
+            format!(
+                "Could not open file (exit code {})",
+                output.status.code().unwrap_or(-1)
+            )
         } else {
             format!("Could not open file: {}", stderr)
         });
@@ -3666,7 +4255,8 @@ pub fn run() {
             #[cfg(target_os = "macos")]
             {
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.set_background_color(Some(tauri::utils::config::Color(0, 0, 0, 0)));
+                    let _ =
+                        window.set_background_color(Some(tauri::utils::config::Color(0, 0, 0, 0)));
                     let _ = window.set_shadow(true);
                 }
             }
@@ -3674,6 +4264,7 @@ pub fn run() {
         })
         .manage(RpcState::default())
         .manage(TerminalState::default())
+        .manage(PiPackageState::default())
         .invoke_handler(tauri::generate_handler![
             rpc_start,
             rpc_send,
@@ -3698,7 +4289,11 @@ pub fn run() {
             save_settings,
             load_settings,
             open_file_dialog,
-            run_pi_cli_command,
+            list_pi_packages,
+            install_pi_package,
+            remove_pi_package,
+            update_pi_packages,
+            list_pi_themes,
             get_cli_update_status,
             get_pi_changelog,
             update_cli_via_npm,
@@ -3731,6 +4326,8 @@ pub fn run() {
                     stop_terminal_instance(&mut handle);
                 }
             };
+            let package_state = app_handle.state::<PiPackageState>();
+            stop_pi_package_child(&package_state.active_child);
         }
     });
 }
@@ -3738,12 +4335,14 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        auth_provider_statuses_from_file, clear_provider_auth_file, create_git_worktree_impl,
-        delete_session_file, get_git_diff_impl, get_git_workspace_status_impl,
-        index_workspace_files_impl, list_git_worktrees_impl, list_workspace_directory_impl,
-        normalize_auth_provider, parse_git_status, read_session_file,
-        read_workspace_text_file_impl, remove_git_worktree_impl, spawn_terminal_process,
-        write_workspace_text_file_impl, MAX_WORKSPACE_FILE_BYTES,
+        auth_provider_statuses_from_file, clear_provider_auth_file, collect_direct_pi_themes,
+        create_git_worktree_impl, delete_session_file, get_git_diff_impl,
+        get_git_workspace_status_impl, index_workspace_files_impl, list_git_worktrees_impl,
+        list_workspace_directory_impl, normalize_auth_provider, parse_git_status,
+        parse_pi_package_list, read_session_file, read_workspace_text_file_impl,
+        remove_git_worktree_impl, spawn_terminal_process, validate_pi_install_source,
+        validate_pi_package_source, write_workspace_text_file_impl, PiPackageScope, PiThemeScope,
+        MAX_WORKSPACE_FILE_BYTES,
     };
     use std::fs;
     use std::io::{Read, Write};
@@ -3759,7 +4358,11 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("system clock before unix epoch")
             .as_nanos();
-        std::env::temp_dir().join(format!("pi-desktop-session-delete-{}-{}", std::process::id(), nonce))
+        std::env::temp_dir().join(format!(
+            "pi-desktop-session-delete-{}-{}",
+            std::process::id(),
+            nonce
+        ))
     }
 
     fn run_test_git(root: &std::path::Path, args: &[&str]) {
@@ -3798,7 +4401,8 @@ mod tests {
         let outside = root.join("outside.jsonl");
         fs::write(&outside, "{\"type\":\"session\"}\n").expect("write outside file");
 
-        let error = delete_session_file(&sessions, &outside).expect_err("outside file must be rejected");
+        let error =
+            delete_session_file(&sessions, &outside).expect_err("outside file must be rejected");
         assert!(error.contains("outside the Pi sessions directory"));
         assert!(outside.exists());
         fs::remove_dir_all(&root).expect("clean test root");
@@ -3923,6 +4527,73 @@ mod tests {
     }
 
     #[test]
+    fn parses_user_project_and_filtered_pi_packages() {
+        let packages = parse_pi_package_list(
+            "User packages:\n  npm:alpha@1.0.0\n    C:\\pi\\alpha\n\nProject packages:\n  git:example.test/team/tools (filtered)\n    C:\\work\\.pi\\git\\tools\n",
+        );
+        assert_eq!(packages.len(), 2);
+        assert_eq!(packages[0].scope, PiPackageScope::User);
+        assert_eq!(packages[0].source, "npm:alpha@1.0.0");
+        assert_eq!(packages[0].installed_path.as_deref(), Some("C:\\pi\\alpha"));
+        assert!(!packages[0].filtered);
+        assert_eq!(packages[1].scope, PiPackageScope::Project);
+        assert_eq!(packages[1].source, "git:example.test/team/tools");
+        assert!(packages[1].filtered);
+    }
+
+    #[test]
+    fn package_sources_are_arguments_and_local_installs_stay_in_workspace() {
+        let root = test_root();
+        let workspace = root.join("workspace");
+        let package = workspace.join("safe package");
+        fs::create_dir_all(&package).expect("create local package");
+        let canonical = fs::canonicalize(&workspace).expect("canonical workspace");
+
+        assert_eq!(
+            validate_pi_install_source(&canonical, " npm:@scope/tools@1.2.3 ")
+                .expect("valid npm source"),
+            "npm:@scope/tools@1.2.3"
+        );
+        assert!(validate_pi_install_source(&canonical, "npm:bad package").is_err());
+        let local = validate_pi_install_source(&canonical, "./safe package")
+            .expect("workspace local package");
+        assert!(fs::canonicalize(local)
+            .expect("canonical validated package")
+            .starts_with(&canonical));
+        assert!(validate_pi_install_source(&canonical, "../outside").is_err());
+        assert!(validate_pi_package_source("--force").is_err());
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn lists_only_valid_direct_pi_theme_files() {
+        let root = test_root();
+        let workspace = root.join("workspace");
+        let themes_dir = workspace.join(".pi").join("themes");
+        fs::create_dir_all(&themes_dir).expect("create theme directory");
+        fs::write(
+            themes_dir.join("warm.json"),
+            r#"{"name":"warm-paper","colors":{}}"#,
+        )
+        .expect("write valid theme");
+        fs::write(themes_dir.join("broken.json"), "{broken").expect("write invalid theme");
+        fs::write(themes_dir.join("notes.txt"), "not a theme").expect("write non-theme file");
+        let canonical = fs::canonicalize(&workspace).expect("canonical workspace");
+        let mut themes = Vec::new();
+        collect_direct_pi_themes(
+            &themes_dir,
+            PiThemeScope::Project,
+            Some(&canonical),
+            &mut themes,
+        );
+        assert_eq!(themes.len(), 1);
+        assert_eq!(themes[0].name, "warm-paper");
+        assert_eq!(themes[0].path.as_deref(), Some(".pi/themes/warm.json"));
+        assert_eq!(themes[0].scope, PiThemeScope::Project);
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
     fn parses_git_branch_tracking_and_rename_records() {
         let root = test_root();
         let status = parse_git_status(
@@ -4032,7 +4703,7 @@ mod tests {
             .expect("write terminal probe");
 
         let mut exit = None;
-        for _ in 0..100 {
+        for _ in 0..200 {
             if let Some(status) = child.try_wait().expect("poll terminal child") {
                 exit = Some(status);
                 break;
