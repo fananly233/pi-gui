@@ -1,12 +1,31 @@
+use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::UNIX_EPOCH;
 use tauri::{AppHandle, Emitter, Manager};
+
+static TERMINAL_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+#[cfg(target_os = "windows")]
+fn terminate_windows_process_tree(pid: u32) {
+    use std::os::windows::process::CommandExt;
+    let _ = Command::new("taskkill.exe")
+        .arg("/PID")
+        .arg(pid.to_string())
+        .arg("/T")
+        .arg("/F")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .creation_flags(0x08000000) // CREATE_NO_WINDOW
+        .status();
+}
 
 #[derive(Default)]
 struct RpcProcessHandle {
@@ -76,21 +95,72 @@ fn stop_rpc_instance(handle: &mut RpcProcessHandle) {
             // npm/Volta .cmd shims create descendants that survive killing only
             // the process represented by std::process::Child. Terminate the exact
             // owned PID tree so credentials and RPC workers cannot outlive Tauri.
-            use std::os::windows::process::CommandExt;
-            let _ = Command::new("taskkill.exe")
-                .arg("/PID")
-                .arg(child.id().to_string())
-                .arg("/T")
-                .arg("/F")
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null())
-                .creation_flags(0x08000000) // CREATE_NO_WINDOW
-                .status();
+            terminate_windows_process_tree(child.id());
         }
         let _ = child.kill();
         let _ = child.wait();
     }
+}
+
+struct TerminalProcessHandle {
+    pid: Option<u32>,
+    writer: Option<Box<dyn Write + Send>>,
+    master: Option<Box<dyn MasterPty + Send>>,
+    killer: Option<Box<dyn ChildKiller + Send + Sync>>,
+}
+
+pub struct TerminalState {
+    instances: Arc<Mutex<HashMap<String, TerminalProcessHandle>>>,
+}
+
+impl Default for TerminalState {
+    fn default() -> Self {
+        Self {
+            instances: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+}
+
+fn stop_terminal_instance(handle: &mut TerminalProcessHandle) {
+    handle.writer = None;
+    #[cfg(target_os = "windows")]
+    if let Some(pid) = handle.pid {
+        terminate_windows_process_tree(pid);
+    }
+    if let Some(mut killer) = handle.killer.take() {
+        let _ = killer.kill();
+    }
+    handle.master = None;
+}
+
+impl Drop for TerminalState {
+    fn drop(&mut self) {
+        if let Ok(mut instances) = self.instances.lock() {
+            for (_, mut handle) in instances.drain() {
+                stop_terminal_instance(&mut handle);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct TerminalOutputEventPayload {
+    terminal_id: String,
+    data: Vec<u8>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct TerminalExitEventPayload {
+    terminal_id: String,
+    exit_code: Option<u32>,
+    reason: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TerminalStartResult {
+    terminal_id: String,
+    shell: String,
+    pid: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1214,6 +1284,20 @@ fn canonical_workspace_root(workspace_root: &str) -> Result<PathBuf, String> {
     Ok(root)
 }
 
+fn external_command_path(path: &Path) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        let raw = path.to_string_lossy();
+        if let Some(rest) = raw.strip_prefix(r"\\?\UNC\") {
+            return PathBuf::from(format!(r"\\{}", rest));
+        }
+        if let Some(rest) = raw.strip_prefix(r"\\?\") {
+            return PathBuf::from(rest);
+        }
+    }
+    path.to_path_buf()
+}
+
 fn ensure_inside_workspace(root: &Path, target: PathBuf) -> Result<PathBuf, String> {
     let resolved = fs::canonicalize(&target)
         .map_err(|e| format!("Could not resolve workspace path: {}", e))?;
@@ -1482,6 +1566,262 @@ async fn write_workspace_file(
 ) -> Result<WorkspaceTextFile, String> {
     let root = canonical_workspace_root(&workspace_root)?;
     write_workspace_text_file_impl(&root, &relative_path, &content, &expected_content)
+}
+
+struct SpawnedTerminal {
+    shell: String,
+    pid: Option<u32>,
+    child: Box<dyn portable_pty::Child + Send + Sync>,
+    reader: Box<dyn Read + Send>,
+    writer: Box<dyn Write + Send>,
+    master: Box<dyn MasterPty + Send>,
+}
+
+fn terminal_size(cols: u16, rows: u16) -> PtySize {
+    PtySize {
+        cols: cols.clamp(20, 400),
+        rows: rows.clamp(5, 200),
+        pixel_width: 0,
+        pixel_height: 0,
+    }
+}
+
+fn terminal_shell() -> Result<(PathBuf, String, Vec<String>), String> {
+    #[cfg(target_os = "windows")]
+    let candidates = ["pwsh.exe", "powershell.exe", "cmd.exe"];
+    #[cfg(target_os = "macos")]
+    let candidates = ["zsh", "bash", "sh"];
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let candidates = ["bash", "zsh", "sh"];
+
+    #[cfg(unix)]
+    if let Ok(configured) = std::env::var("SHELL") {
+        let configured_path = PathBuf::from(configured.trim());
+        if configured_path.is_file() {
+            let label = configured_path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .unwrap_or("shell")
+                .to_string();
+            return Ok((configured_path, label, Vec::new()));
+        }
+    }
+
+    for candidate in candidates {
+        let Ok(path) = which::which(candidate) else {
+            continue;
+        };
+        let label = path
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .unwrap_or(candidate)
+            .to_string();
+        #[cfg(target_os = "windows")]
+        let args = if label.eq_ignore_ascii_case("cmd") {
+            vec!["/Q".to_string()]
+        } else {
+            vec!["-NoLogo".to_string()]
+        };
+        #[cfg(not(target_os = "windows"))]
+        let args = Vec::new();
+        return Ok((path, label, args));
+    }
+
+    Err("No supported terminal shell was found".to_string())
+}
+
+fn spawn_terminal_process(root: &Path, cols: u16, rows: u16) -> Result<SpawnedTerminal, String> {
+    let (shell_path, shell, args) = terminal_shell()?;
+    let pair = native_pty_system()
+        .openpty(terminal_size(cols, rows))
+        .map_err(|e| format!("Could not open a native PTY: {}", e))?;
+    let mut command = CommandBuilder::new(&shell_path);
+    command.args(args);
+    command.cwd(external_command_path(root));
+    command.env("TERM", "xterm-256color");
+    command.env("COLORTERM", "truecolor");
+    let child = pair
+        .slave
+        .spawn_command(command)
+        .map_err(|e| format!("Could not start {} in the native PTY: {}", shell, e))?;
+    drop(pair.slave);
+    let pid = child.process_id();
+    let reader = pair
+        .master
+        .try_clone_reader()
+        .map_err(|e| format!("Could not open terminal output: {}", e))?;
+    let writer = pair
+        .master
+        .take_writer()
+        .map_err(|e| format!("Could not open terminal input: {}", e))?;
+    Ok(SpawnedTerminal {
+        shell,
+        pid,
+        child,
+        reader,
+        writer,
+        master: pair.master,
+    })
+}
+
+#[tauri::command]
+async fn terminal_start(
+    app: AppHandle,
+    state: tauri::State<'_, TerminalState>,
+    workspace_root: String,
+    cols: u16,
+    rows: u16,
+) -> Result<TerminalStartResult, String> {
+    let root = canonical_workspace_root(&workspace_root)?;
+    let spawned = spawn_terminal_process(&root, cols, rows)?;
+    let terminal_id = format!(
+        "terminal-{}-{}",
+        std::process::id(),
+        TERMINAL_SEQUENCE.fetch_add(1, Ordering::Relaxed) + 1
+    );
+    let shell = spawned.shell.clone();
+    let pid = spawned.pid;
+    let killer = spawned.child.clone_killer();
+    let mut reader = spawned.reader;
+    let mut child = spawned.child;
+
+    {
+        let mut instances = state
+            .instances
+            .lock()
+            .map_err(|_| "Terminal state lock is poisoned".to_string())?;
+        instances.insert(
+            terminal_id.clone(),
+            TerminalProcessHandle {
+                pid,
+                writer: Some(spawned.writer),
+                master: Some(spawned.master),
+                killer: Some(killer),
+            },
+        );
+    }
+
+    let output_id = terminal_id.clone();
+    let output_app = app.clone();
+    std::thread::spawn(move || {
+        let mut buffer = [0_u8; 8192];
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(read) => {
+                    let _ = output_app.emit(
+                        "terminal-output",
+                        TerminalOutputEventPayload {
+                            terminal_id: output_id.clone(),
+                            data: buffer[..read].to_vec(),
+                        },
+                    );
+                }
+                Err(_) => break,
+            }
+        }
+    });
+
+    let wait_id = terminal_id.clone();
+    let wait_app = app;
+    let wait_instances = state.instances.clone();
+    std::thread::spawn(move || {
+        let waited = child.wait();
+        if let Ok(mut instances) = wait_instances.lock() {
+            instances.remove(&wait_id);
+        }
+        let (exit_code, reason) = match waited {
+            Ok(status) => (
+                Some(status.exit_code()),
+                status
+                    .signal()
+                    .map(|signal| format!("signal {}", signal))
+                    .unwrap_or_else(|| format!("exit {}", status.exit_code())),
+            ),
+            Err(error) => (None, format!("wait failed: {}", error)),
+        };
+        let _ = wait_app.emit(
+            "terminal-exit",
+            TerminalExitEventPayload {
+                terminal_id: wait_id,
+                exit_code,
+                reason,
+            },
+        );
+    });
+
+    Ok(TerminalStartResult {
+        terminal_id,
+        shell,
+        pid,
+    })
+}
+
+#[tauri::command]
+async fn terminal_write(
+    state: tauri::State<'_, TerminalState>,
+    terminal_id: String,
+    data: String,
+) -> Result<(), String> {
+    if data.len() > 64 * 1024 {
+        return Err("Terminal input chunk is too large".to_string());
+    }
+    let mut instances = state
+        .instances
+        .lock()
+        .map_err(|_| "Terminal state lock is poisoned".to_string())?;
+    let handle = instances
+        .get_mut(terminal_id.trim())
+        .ok_or_else(|| "Terminal is not running".to_string())?;
+    let writer = handle
+        .writer
+        .as_mut()
+        .ok_or_else(|| "Terminal input is closed".to_string())?;
+    writer
+        .write_all(data.as_bytes())
+        .and_then(|_| writer.flush())
+        .map_err(|e| format!("Could not write to terminal: {}", e))
+}
+
+#[tauri::command]
+async fn terminal_resize(
+    state: tauri::State<'_, TerminalState>,
+    terminal_id: String,
+    cols: u16,
+    rows: u16,
+) -> Result<(), String> {
+    let instances = state
+        .instances
+        .lock()
+        .map_err(|_| "Terminal state lock is poisoned".to_string())?;
+    let handle = instances
+        .get(terminal_id.trim())
+        .ok_or_else(|| "Terminal is not running".to_string())?;
+    let master = handle
+        .master
+        .as_ref()
+        .ok_or_else(|| "Terminal PTY is closed".to_string())?;
+    master
+        .resize(terminal_size(cols, rows))
+        .map_err(|e| format!("Could not resize terminal: {}", e))
+}
+
+#[tauri::command]
+async fn terminal_stop(
+    state: tauri::State<'_, TerminalState>,
+    terminal_id: String,
+) -> Result<bool, String> {
+    let mut handle = state
+        .instances
+        .lock()
+        .map_err(|_| "Terminal state lock is poisoned".to_string())?
+        .remove(terminal_id.trim());
+    if let Some(handle) = handle.as_mut() {
+        stop_terminal_instance(handle);
+        Ok(true)
+    } else {
+        Ok(false)
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -2137,17 +2477,41 @@ struct NpmCommandResult {
     exit_code: i32,
 }
 
-#[derive(Debug, Deserialize)]
-struct GitCommandOptions {
-    args: Vec<String>,
-    cwd: Option<String>,
+const MAX_GIT_DIFF_BYTES: usize = 512 * 1024;
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+struct GitChange {
+    path: String,
+    index_status: String,
+    worktree_status: String,
 }
 
-#[derive(Debug, Serialize)]
-struct GitCommandResult {
-    stdout: String,
-    stderr: String,
-    exit_code: i32,
+#[derive(Debug, Serialize, PartialEq, Eq)]
+struct GitWorkspaceStatus {
+    repository_root: String,
+    branch: String,
+    upstream: Option<String>,
+    ahead: u32,
+    behind: u32,
+    changes: Vec<GitChange>,
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq)]
+struct GitDiffResult {
+    content: String,
+    truncated: bool,
+}
+
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+struct GitWorktree {
+    path: String,
+    branch: Option<String>,
+    head: String,
+    is_main: bool,
+    is_current: bool,
+    dirty: bool,
+    locked: bool,
+    prunable: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2616,39 +2980,482 @@ async fn update_cli_via_npm() -> Result<NpmCommandResult, String> {
     })
 }
 
-#[tauri::command]
-async fn run_git_command(options: GitCommandOptions) -> Result<GitCommandResult, String> {
-    if options.args.is_empty() {
-        return Err("No git command arguments provided".to_string());
-    }
-
+fn git_output<I, S>(root: &Path, args: I) -> Result<std::process::Output, String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
     let git_path = which::which("git").map_err(|_| "git was not found on PATH".to_string())?;
-
     let mut cmd = Command::new(git_path);
-    cmd.args(&options.args)
+    cmd.arg("-C")
+        .arg(external_command_path(root))
+        .args(args)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GIT_PAGER", "cat")
+        .env("LC_ALL", "C")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-
-    if let Some(cwd) = options.cwd {
-        cmd.current_dir(cwd);
-    }
-
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
     }
+    cmd.output()
+        .map_err(|e| format!("Failed to run git: {}", e))
+}
 
-    let output = cmd
-        .output()
-        .map_err(|e| format!("Failed to run git command: {}", e))?;
+fn git_failure_message(output: &std::process::Output, fallback: &str) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stderr.is_empty() {
+        return stderr;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if !stdout.is_empty() {
+        return stdout;
+    }
+    fallback.to_string()
+}
 
-    Ok(GitCommandResult {
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        exit_code: output.status.code().unwrap_or(-1),
+fn git_checked_output<I, S>(root: &Path, args: I, fallback: &str) -> Result<Vec<u8>, String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    let output = git_output(root, args)?;
+    if !output.status.success() {
+        return Err(git_failure_message(&output, fallback));
+    }
+    Ok(output.stdout)
+}
+
+fn resolve_git_repository(workspace_root: &str) -> Result<PathBuf, String> {
+    let root = canonical_workspace_root(workspace_root)?;
+    let output = git_checked_output(
+        &root,
+        ["rev-parse", "--show-toplevel"],
+        "The selected workspace is not a Git repository",
+    )?;
+    let reported = String::from_utf8(output)
+        .map_err(|_| "Git returned a non-UTF-8 repository path".to_string())?;
+    let repository = fs::canonicalize(reported.trim())
+        .map_err(|e| format!("Could not resolve the Git repository root: {}", e))?;
+    if repository != root {
+        return Err("Open the Git repository root to use Git and worktrees".to_string());
+    }
+    Ok(repository)
+}
+
+fn parse_git_branch_header(header: &str) -> (String, Option<String>, u32, u32) {
+    let value = header.trim().strip_prefix("## ").unwrap_or(header.trim());
+    if let Some(branch) = value.strip_prefix("No commits yet on ") {
+        return (branch.trim().to_string(), None, 0, 0);
+    }
+    if value.starts_with("HEAD (no branch)") {
+        return ("Detached HEAD".to_string(), None, 0, 0);
+    }
+    let Some((branch, tracking)) = value.split_once("...") else {
+        return (value.to_string(), None, 0, 0);
+    };
+    let (upstream, state) = tracking
+        .split_once(" [")
+        .map(|(name, state)| (name.trim(), Some(state.trim_end_matches(']'))))
+        .unwrap_or((tracking.trim(), None));
+    let mut ahead = 0;
+    let mut behind = 0;
+    if let Some(state) = state {
+        for item in state.split(',') {
+            let item = item.trim();
+            if let Some(value) = item.strip_prefix("ahead ") {
+                ahead = value.parse().unwrap_or(0);
+            } else if let Some(value) = item.strip_prefix("behind ") {
+                behind = value.parse().unwrap_or(0);
+            }
+        }
+    }
+    (
+        branch.trim().to_string(),
+        if upstream.is_empty() {
+            None
+        } else {
+            Some(upstream.to_string())
+        },
+        ahead,
+        behind,
+    )
+}
+
+fn parse_git_status(root: &Path, output: &[u8]) -> Result<GitWorkspaceStatus, String> {
+    let records = output
+        .split(|byte| *byte == 0)
+        .filter(|record| !record.is_empty())
+        .collect::<Vec<_>>();
+    let header = records
+        .first()
+        .ok_or_else(|| "Git status did not return branch metadata".to_string())?;
+    let (branch, upstream, ahead, behind) =
+        parse_git_branch_header(&String::from_utf8_lossy(header));
+    let mut changes = Vec::new();
+    let mut index = 1;
+    while index < records.len() {
+        let record = records[index];
+        if record.len() < 3 {
+            index += 1;
+            continue;
+        }
+        let index_status = char::from(record[0]).to_string();
+        let worktree_status = char::from(record[1]).to_string();
+        let path = String::from_utf8_lossy(&record[3..]).to_string();
+        changes.push(GitChange {
+            path,
+            index_status: index_status.clone(),
+            worktree_status: worktree_status.clone(),
+        });
+        if matches!(index_status.as_str(), "R" | "C")
+            || matches!(worktree_status.as_str(), "R" | "C")
+        {
+            index += 1;
+        }
+        index += 1;
+    }
+    Ok(GitWorkspaceStatus {
+        repository_root: external_command_path(root).to_string_lossy().to_string(),
+        branch,
+        upstream,
+        ahead,
+        behind,
+        changes,
     })
+}
+
+fn get_git_workspace_status_impl(root: &Path) -> Result<GitWorkspaceStatus, String> {
+    let output = git_checked_output(
+        root,
+        [
+            "--no-optional-locks",
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--branch",
+            "--untracked-files=normal",
+        ],
+        "Could not read Git status",
+    )?;
+    parse_git_status(root, &output)
+}
+
+fn bounded_git_diff(bytes: Vec<u8>) -> GitDiffResult {
+    let truncated = bytes.len() > MAX_GIT_DIFF_BYTES;
+    let slice = if truncated {
+        &bytes[..MAX_GIT_DIFF_BYTES]
+    } else {
+        &bytes
+    };
+    let mut content = String::from_utf8_lossy(slice).to_string();
+    if truncated {
+        content.push_str("\n\n… diff truncated at 512 KiB …\n");
+    }
+    GitDiffResult { content, truncated }
+}
+
+fn get_git_diff_impl(
+    root: &Path,
+    relative_path: Option<&str>,
+    staged: bool,
+) -> Result<GitDiffResult, String> {
+    let mut args = vec![
+        std::ffi::OsString::from("--no-pager"),
+        std::ffi::OsString::from("diff"),
+        std::ffi::OsString::from("--no-ext-diff"),
+        std::ffi::OsString::from("--no-textconv"),
+        std::ffi::OsString::from("--unified=3"),
+    ];
+    if staged {
+        args.push(std::ffi::OsString::from("--cached"));
+    }
+    args.push(std::ffi::OsString::from("--"));
+    if let Some(path) = relative_path {
+        let relative = workspace_relative_path(path.trim(), false)?;
+        let normalized = path_to_workspace_string(&relative)
+            .ok_or_else(|| "Git paths must be valid UTF-8 workspace paths".to_string())?;
+        args.push(std::ffi::OsString::from(normalized));
+    }
+    let output = git_checked_output(root, args, "Could not read Git diff")?;
+    Ok(bounded_git_diff(output))
+}
+
+#[derive(Default)]
+struct RawGitWorktree {
+    path: Option<PathBuf>,
+    branch: Option<String>,
+    head: String,
+    locked: bool,
+    prunable: bool,
+}
+
+fn parse_git_worktree_records(output: &[u8]) -> Vec<RawGitWorktree> {
+    let mut parsed = Vec::new();
+    let mut current = RawGitWorktree::default();
+    for record in output.split(|byte| *byte == 0) {
+        if record.is_empty() {
+            if current.path.is_some() {
+                parsed.push(current);
+                current = RawGitWorktree::default();
+            }
+            continue;
+        }
+        let record = String::from_utf8_lossy(record);
+        if let Some(value) = record.strip_prefix("worktree ") {
+            if current.path.is_some() {
+                parsed.push(current);
+                current = RawGitWorktree::default();
+            }
+            current.path = Some(PathBuf::from(value));
+        } else if let Some(value) = record.strip_prefix("HEAD ") {
+            current.head = value.trim().to_string();
+        } else if let Some(value) = record.strip_prefix("branch ") {
+            current.branch = Some(
+                value
+                    .trim()
+                    .strip_prefix("refs/heads/")
+                    .unwrap_or(value.trim())
+                    .to_string(),
+            );
+        } else if record == "locked" || record.starts_with("locked ") {
+            current.locked = true;
+        } else if record == "prunable" || record.starts_with("prunable ") {
+            current.prunable = true;
+        }
+    }
+    if current.path.is_some() {
+        parsed.push(current);
+    }
+    parsed
+}
+
+fn paths_equal(left: &Path, right: &Path) -> bool {
+    match (fs::canonicalize(left), fs::canonicalize(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => left == right,
+    }
+}
+
+fn git_worktree_dirty(path: &Path) -> bool {
+    if !path.is_dir() {
+        return true;
+    }
+    match git_output(
+        path,
+        [
+            "--no-optional-locks",
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=normal",
+        ],
+    ) {
+        Ok(output) => !output.status.success() || !output.stdout.is_empty(),
+        Err(_) => true,
+    }
+}
+
+fn list_git_worktrees_impl(root: &Path) -> Result<Vec<GitWorktree>, String> {
+    let output = git_checked_output(
+        root,
+        ["worktree", "list", "--porcelain", "-z"],
+        "Could not list Git worktrees",
+    )?;
+    Ok(parse_git_worktree_records(&output)
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, item)| {
+            let path = item.path?;
+            Some(GitWorktree {
+                dirty: git_worktree_dirty(&path),
+                is_main: index == 0,
+                is_current: paths_equal(&path, root),
+                path: path.to_string_lossy().to_string(),
+                branch: item.branch,
+                head: item.head,
+                locked: item.locked,
+                prunable: item.prunable,
+            })
+        })
+        .collect())
+}
+
+fn validate_worktree_branch(root: &Path, branch: &str) -> Result<String, String> {
+    let branch = branch.trim();
+    if branch.is_empty() || branch.len() > 160 {
+        return Err("Enter a branch name between 1 and 160 characters".to_string());
+    }
+    if !branch
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-' | '/'))
+    {
+        return Err("Use letters, numbers, '.', '_', '-', or '/' in branch names".to_string());
+    }
+    let output = git_output(root, ["check-ref-format", "--branch", branch])?;
+    if !output.status.success() {
+        return Err(git_failure_message(&output, "Invalid Git branch name"));
+    }
+    Ok(branch.to_string())
+}
+
+fn worktree_destination(root: &Path, branch: &str) -> Result<PathBuf, String> {
+    let command_root = external_command_path(root);
+    let parent = command_root
+        .parent()
+        .ok_or_else(|| "The repository has no parent directory for a worktree".to_string())?;
+    let repository_name = command_root
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| "The repository folder name is not valid UTF-8".to_string())?;
+    let slug = branch
+        .chars()
+        .map(|ch| if ch == '/' { '-' } else { ch })
+        .collect::<String>();
+    Ok(parent.join(format!("{}-{}", repository_name, slug)))
+}
+
+fn create_git_worktree_impl(
+    root: &Path,
+    branch: &str,
+    create_branch: bool,
+) -> Result<GitWorktree, String> {
+    let branch = validate_worktree_branch(root, branch)?;
+    let destination = worktree_destination(root, &branch)?;
+    if destination.exists() {
+        return Err(format!(
+            "Worktree destination already exists: {}",
+            destination.to_string_lossy()
+        ));
+    }
+    if !create_branch {
+        let reference = format!("refs/heads/{}", branch);
+        let output = git_output(root, ["show-ref", "--verify", "--quiet", &reference])?;
+        if !output.status.success() {
+            return Err(format!("Local branch does not exist: {}", branch));
+        }
+    }
+    let mut args = vec![
+        std::ffi::OsString::from("worktree"),
+        std::ffi::OsString::from("add"),
+    ];
+    if create_branch {
+        args.push(std::ffi::OsString::from("-b"));
+        args.push(std::ffi::OsString::from(&branch));
+    }
+    args.push(destination.as_os_str().to_owned());
+    if !create_branch {
+        args.push(std::ffi::OsString::from(&branch));
+    }
+    git_checked_output(root, args, "Could not create Git worktree")?;
+    let canonical_destination = fs::canonicalize(&destination)
+        .map_err(|e| format!("Created worktree could not be resolved: {}", e))?;
+    list_git_worktrees_impl(root)?
+        .into_iter()
+        .find(|worktree| paths_equal(Path::new(&worktree.path), &canonical_destination))
+        .ok_or_else(|| "Git created the worktree but did not list it".to_string())
+}
+
+fn remove_git_worktree_impl(root: &Path, worktree_path: &str) -> Result<bool, String> {
+    let requested = PathBuf::from(worktree_path.trim());
+    if requested.as_os_str().is_empty() {
+        return Err("Choose a worktree to remove".to_string());
+    }
+    let worktree = list_git_worktrees_impl(root)?
+        .into_iter()
+        .find(|item| paths_equal(Path::new(&item.path), &requested))
+        .ok_or_else(|| "The requested path is not a worktree of this repository".to_string())?;
+    if worktree.is_main {
+        return Err("The main worktree cannot be removed".to_string());
+    }
+    if worktree.is_current {
+        return Err("The currently open worktree cannot be removed".to_string());
+    }
+    if worktree.locked {
+        return Err("Locked worktrees cannot be removed".to_string());
+    }
+    if worktree.prunable || !Path::new(&worktree.path).is_dir() {
+        return Err("Prunable worktree metadata is not removed by this UI".to_string());
+    }
+    if worktree.dirty {
+        return Err(
+            "Worktree has uncommitted or untracked files; clean it before removal".to_string(),
+        );
+    }
+    git_checked_output(
+        root,
+        [
+            std::ffi::OsString::from("worktree"),
+            std::ffi::OsString::from("remove"),
+            Path::new(&worktree.path).as_os_str().to_owned(),
+        ],
+        "Could not remove Git worktree",
+    )?;
+    Ok(true)
+}
+
+#[tauri::command]
+async fn get_git_workspace_status(workspace_root: String) -> Result<GitWorkspaceStatus, String> {
+    tokio::task::spawn_blocking(move || {
+        let root = resolve_git_repository(&workspace_root)?;
+        get_git_workspace_status_impl(&root)
+    })
+    .await
+    .map_err(|e| format!("Git status task failed: {}", e))?
+}
+
+#[tauri::command]
+async fn get_git_diff(
+    workspace_root: String,
+    relative_path: Option<String>,
+    staged: bool,
+) -> Result<GitDiffResult, String> {
+    tokio::task::spawn_blocking(move || {
+        let root = resolve_git_repository(&workspace_root)?;
+        get_git_diff_impl(&root, relative_path.as_deref(), staged)
+    })
+    .await
+    .map_err(|e| format!("Git diff task failed: {}", e))?
+}
+
+#[tauri::command]
+async fn list_git_worktrees(workspace_root: String) -> Result<Vec<GitWorktree>, String> {
+    tokio::task::spawn_blocking(move || {
+        let root = resolve_git_repository(&workspace_root)?;
+        list_git_worktrees_impl(&root)
+    })
+    .await
+    .map_err(|e| format!("Git worktree task failed: {}", e))?
+}
+
+#[tauri::command]
+async fn create_git_worktree(
+    workspace_root: String,
+    branch: String,
+    create_branch: bool,
+) -> Result<GitWorktree, String> {
+    tokio::task::spawn_blocking(move || {
+        let root = resolve_git_repository(&workspace_root)?;
+        create_git_worktree_impl(&root, &branch, create_branch)
+    })
+    .await
+    .map_err(|e| format!("Git worktree creation task failed: {}", e))?
+}
+
+#[tauri::command]
+async fn remove_git_worktree(
+    workspace_root: String,
+    worktree_path: String,
+) -> Result<bool, String> {
+    tokio::task::spawn_blocking(move || {
+        let root = resolve_git_repository(&workspace_root)?;
+        remove_git_worktree_impl(&root, &worktree_path)
+    })
+    .await
+    .map_err(|e| format!("Git worktree removal task failed: {}", e))?
 }
 
 #[tauri::command]
@@ -2866,6 +3673,7 @@ pub fn run() {
             Ok(())
         })
         .manage(RpcState::default())
+        .manage(TerminalState::default())
         .invoke_handler(tauri::generate_handler![
             rpc_start,
             rpc_send,
@@ -2880,6 +3688,10 @@ pub fn run() {
             index_workspace_files,
             read_workspace_file,
             write_workspace_file,
+            terminal_start,
+            terminal_write,
+            terminal_resize,
+            terminal_stop,
             get_pi_auth_status,
             get_pi_oauth_providers,
             clear_pi_provider_auth,
@@ -2890,7 +3702,11 @@ pub fn run() {
             get_cli_update_status,
             get_pi_changelog,
             update_cli_via_npm,
-            run_git_command,
+            get_git_workspace_status,
+            get_git_diff,
+            list_git_worktrees,
+            create_git_worktree,
+            remove_git_worktree,
             create_share_gist,
             get_desktop_runtime_info,
             open_path_in_default_app,
@@ -2899,11 +3715,20 @@ pub fn run() {
         .expect("error while building tauri application");
 
     app.run(|app_handle, event| {
-        if matches!(event, tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit) {
+        if matches!(
+            event,
+            tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit
+        ) {
             let state = app_handle.state::<RpcState>();
             if let Ok(mut instances) = state.instances.lock() {
                 for (_, mut handle) in instances.drain() {
                     stop_rpc_instance(&mut handle);
+                }
+            };
+            let terminal_state = app_handle.state::<TerminalState>();
+            if let Ok(mut instances) = terminal_state.instances.lock() {
+                for (_, mut handle) in instances.drain() {
+                    stop_terminal_instance(&mut handle);
                 }
             };
         }
@@ -2913,12 +3738,20 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        auth_provider_statuses_from_file, clear_provider_auth_file, delete_session_file,
-        index_workspace_files_impl, list_workspace_directory_impl, normalize_auth_provider,
-        read_session_file, read_workspace_text_file_impl, write_workspace_text_file_impl,
-        MAX_WORKSPACE_FILE_BYTES,
+        auth_provider_statuses_from_file, clear_provider_auth_file, create_git_worktree_impl,
+        delete_session_file, get_git_diff_impl, get_git_workspace_status_impl,
+        index_workspace_files_impl, list_git_worktrees_impl, list_workspace_directory_impl,
+        normalize_auth_provider, parse_git_status, read_session_file,
+        read_workspace_text_file_impl, remove_git_worktree_impl, spawn_terminal_process,
+        write_workspace_text_file_impl, MAX_WORKSPACE_FILE_BYTES,
     };
     use std::fs;
+    use std::io::{Read, Write};
+    use std::path::PathBuf;
+    use std::process::{Command, Stdio};
+    use std::sync::mpsc;
+    use std::thread;
+    use std::time::Duration;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn test_root() -> std::path::PathBuf {
@@ -2927,6 +3760,20 @@ mod tests {
             .expect("system clock before unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("pi-desktop-session-delete-{}-{}", std::process::id(), nonce))
+    }
+
+    fn run_test_git(root: &std::path::Path, args: &[&str]) {
+        let status = Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .expect("run git test command");
+        assert!(status.success(), "git command failed: git {:?}", args);
     }
 
     #[test]
@@ -3073,6 +3920,143 @@ mod tests {
             "external\n"
         );
         fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn parses_git_branch_tracking_and_rename_records() {
+        let root = test_root();
+        let status = parse_git_status(
+            &root,
+            b"## main...origin/main [ahead 2, behind 1]\0 M src/main.ts\0R  src/new.ts\0src/old.ts\0?? notes.txt\0",
+        )
+        .expect("parse porcelain status");
+        assert_eq!(status.branch, "main");
+        assert_eq!(status.upstream.as_deref(), Some("origin/main"));
+        assert_eq!(status.ahead, 2);
+        assert_eq!(status.behind, 1);
+        assert_eq!(status.changes.len(), 3);
+        assert_eq!(status.changes[0].path, "src/main.ts");
+        assert_eq!(status.changes[1].path, "src/new.ts");
+        assert_eq!(status.changes[2].path, "notes.txt");
+    }
+
+    #[test]
+    fn runs_real_git_status_diff_and_guarded_worktree_flow() {
+        let root = test_root();
+        let repository = root.join("repo");
+        fs::create_dir_all(&repository).expect("create test repository");
+        run_test_git(&repository, &["init", "-b", "main"]);
+        run_test_git(&repository, &["config", "user.name", "Pi Desktop Test"]);
+        run_test_git(
+            &repository,
+            &["config", "user.email", "pi-desktop@example.invalid"],
+        );
+        fs::write(repository.join("tracked.txt"), "first\n").expect("write tracked file");
+        run_test_git(&repository, &["add", "tracked.txt"]);
+        run_test_git(
+            &repository,
+            &["-c", "commit.gpgsign=false", "commit", "-m", "baseline"],
+        );
+        let canonical = fs::canonicalize(&repository).expect("canonical test repository");
+
+        let clean = get_git_workspace_status_impl(&canonical).expect("read clean status");
+        assert_eq!(clean.branch, "main");
+        assert!(clean.changes.is_empty());
+
+        fs::write(repository.join("tracked.txt"), "second\n").expect("modify tracked file");
+        fs::write(repository.join("untracked.txt"), "new\n").expect("write untracked file");
+        let dirty = get_git_workspace_status_impl(&canonical).expect("read dirty status");
+        assert_eq!(dirty.changes.len(), 2);
+        let diff =
+            get_git_diff_impl(&canonical, Some("tracked.txt"), false).expect("read real git diff");
+        assert!(diff.content.contains("-first"));
+        assert!(diff.content.contains("+second"));
+
+        fs::write(repository.join("tracked.txt"), "first\n").expect("restore tracked file");
+        fs::remove_file(repository.join("untracked.txt")).expect("remove untracked file");
+        let worktree = create_git_worktree_impl(&canonical, "phase6-test", true)
+            .expect("create guarded worktree");
+        assert!(PathBuf::from(&worktree.path).is_dir());
+        assert!(!worktree.is_main);
+        assert!(
+            remove_git_worktree_impl(&canonical, canonical.to_string_lossy().as_ref()).is_err()
+        );
+
+        let dirty_file = PathBuf::from(&worktree.path).join("dirty.txt");
+        fs::write(&dirty_file, "dirty\n").expect("dirty linked worktree");
+        assert!(remove_git_worktree_impl(&canonical, &worktree.path).is_err());
+        fs::remove_file(&dirty_file).expect("clean linked worktree");
+        assert!(remove_git_worktree_impl(&canonical, &worktree.path)
+            .expect("remove clean linked worktree"));
+        assert!(!PathBuf::from(&worktree.path).exists());
+        assert_eq!(
+            list_git_worktrees_impl(&canonical)
+                .expect("list remaining worktrees")
+                .len(),
+            1
+        );
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn opens_a_real_native_terminal_pty() {
+        let root = test_root();
+        fs::create_dir_all(&root).expect("create terminal test root");
+        let terminal = spawn_terminal_process(&root, 100, 30).expect("spawn native terminal");
+        let shell = terminal.shell.to_lowercase();
+        let mut child = terminal.child;
+        let mut writer = terminal.writer;
+        let mut reader = terminal.reader;
+        let master = terminal.master;
+        let command = if cfg!(target_os = "windows") && shell == "cmd" {
+            "echo __PI_PTY_OK__\r\nexit /B 0\r\n"
+        } else if cfg!(target_os = "windows") {
+            "Write-Output __PI_PTY_OK__; exit 0\r\n"
+        } else {
+            "printf '__PI_PTY_OK__\\n'; exit 0\n"
+        };
+        let (output_tx, output_rx) = mpsc::channel();
+        thread::spawn(move || {
+            let mut bytes = Vec::new();
+            let _ = reader.read_to_end(&mut bytes);
+            let _ = output_tx.send(bytes);
+        });
+        if cfg!(target_os = "windows") && shell != "cmd" {
+            writer
+                .write_all(b"\x1b[1;1R")
+                .expect("answer PowerShell cursor-position probe");
+        }
+        writer
+            .write_all(command.as_bytes())
+            .and_then(|_| writer.flush())
+            .expect("write terminal probe");
+
+        let mut exit = None;
+        for _ in 0..100 {
+            if let Some(status) = child.try_wait().expect("poll terminal child") {
+                exit = Some(status);
+                break;
+            }
+            thread::sleep(Duration::from_millis(25));
+        }
+        if exit.is_none() {
+            let _ = child.kill();
+        }
+        let exit = exit.expect("terminal shell did not exit after probe");
+        drop(writer);
+        drop(master);
+        let output = output_rx
+            .recv_timeout(Duration::from_secs(3))
+            .expect("read terminal probe output");
+        assert!(
+            exit.success(),
+            "terminal shell {} exited with {}: {}",
+            shell,
+            exit.exit_code(),
+            String::from_utf8_lossy(&output)
+        );
+        assert!(String::from_utf8_lossy(&output).contains("__PI_PTY_OK__"));
+        fs::remove_dir_all(&root).expect("clean terminal test root");
     }
 
     #[test]
