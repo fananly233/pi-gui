@@ -6,17 +6,18 @@ type ChatInputProps = {
 	activity: ChatActivity;
 	sending: boolean;
 	aborting: boolean;
+	configuringModel: boolean;
 	onSend: (text: string, delivery: ChatDelivery) => Promise<void>;
 	onAbort: () => Promise<void>;
 	seed: { id: number; text: string } | null;
 };
 
-export function ChatInput({ connected, activity, sending, aborting, onSend, onAbort, seed }: ChatInputProps) {
+export function ChatInput({ connected, activity, sending, aborting, configuringModel, onSend, onAbort, seed }: ChatInputProps) {
 	const [text, setText] = useState("");
 	const [queuedDelivery, setQueuedDelivery] = useState<Exclude<ChatDelivery, "prompt">>("steer");
 	const running = activity !== "idle";
 	const delivery: ChatDelivery = running ? queuedDelivery : "prompt";
-	const canSend = connected && text.trim().length > 0 && !sending;
+	const canSend = connected && text.trim().length > 0 && !sending && !configuringModel;
 
 	useEffect(() => {
 		if (seed) setText(seed.text);
@@ -49,8 +50,8 @@ export function ChatInput({ connected, activity, sending, aborting, onSend, onAb
 					value={text}
 					onChange={(event) => setText(event.target.value)}
 					onKeyDown={onKeyDown}
-					placeholder={connected ? (running ? "Add direction while Pi is working…" : "Ask Pi about this workspace…") : "Connect Pi to start chatting…"}
-					disabled={!connected}
+					placeholder={configuringModel ? "Wait for Pi to finish configuring the model…" : connected ? (running ? "Add direction while Pi is working…" : "Ask Pi about this workspace…") : "Connect Pi to start chatting…"}
+					disabled={!connected || configuringModel}
 					rows={3}
 				/>
 				<div className="composer__actions">
@@ -62,7 +63,7 @@ export function ChatInput({ connected, activity, sending, aborting, onSend, onAb
 							</button>
 						) : null}
 						<button type="button" className="button button--primary" onClick={submit} disabled={!canSend} data-testid="send-button">
-							{sending ? "Sending…" : running ? (delivery === "steer" ? "Queue steer" : "Queue follow-up") : "Send"}
+							{configuringModel ? "Configuring…" : sending ? "Sending…" : running ? (delivery === "steer" ? "Queue steer" : "Queue follow-up") : "Send"}
 						</button>
 					</div>
 				</div>

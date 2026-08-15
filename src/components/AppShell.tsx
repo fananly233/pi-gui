@@ -115,6 +115,9 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 						queue={chat.queue}
 						sending={chat.sending}
 						aborting={chat.aborting}
+						configuringModel={chat.configuringModel}
+						model={chat.model}
+						thinkingLevel={chat.thinkingLevel}
 						lastError={chat.lastError}
 						sessionReady={chat.sessionReady}
 						activeSessionName={chat.activeSessionName}
@@ -122,6 +125,12 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 						activeRuntimePhase={chat.activeRuntimePhase}
 						selectingRuntimeKey={chat.selectingRuntimeKey}
 						composerSeed={chat.composerSeed}
+						activeRuntimeKey={chat.activeRuntimeKey}
+						sessionRuntimes={chat.sessionRuntimes}
+						loadModelConfiguration={chat.loadModelConfiguration}
+						setModel={chat.setModel}
+						setThinkingLevel={chat.setThinkingLevel}
+						disconnect={chat.disconnect}
 						send={chat.send}
 						abort={chat.abort}
 						clearError={chat.clearError}
