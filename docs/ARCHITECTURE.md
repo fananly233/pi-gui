@@ -74,7 +74,17 @@ Key goals:
 - avoid stale event application when switching fast
 - keep UI responsive during reconnects/restarts
 
-Each runtime has a stable instance id and a Rust generation. Pi events update only the snapshot owned by that runtime, while a monotonic selection guard prevents a slower session load from replacing a newer selection. Closing or disconnecting drains every runtime process.
+Each runtime has a stable instance id and a Rust generation. Pi events update only the snapshot owned by that runtime, while a monotonic selection guard prevents a slower session load from replacing a newer selection. Model and thinking settings are stored on that same runtime snapshot, so switching sessions cannot bleed configuration across conversations. Closing or disconnecting drains every runtime process, including Windows `.cmd`/Volta descendant trees.
+
+## Model and authentication boundary
+
+Model listing, selection, and thinking levels use Pi RPC. Full Pi model records are normalized to safe display fields before entering React state; provider headers, endpoint configuration, and credential material are discarded.
+
+Authentication remains owned by Pi:
+- Rust exposes provider/source/type metadata, never credential values.
+- Environment credentials are read-only in the GUI.
+- Removing a credential stored in Pi requires an explicit confirmation and then disconnects all runtimes.
+- Interactive login is performed with `/login` in Pi TUI because Pi RPC 0.84.2 has no login command. The desktop does not add an Electron/Node auth host to work around that boundary.
 
 ---
 

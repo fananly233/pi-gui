@@ -62,6 +62,23 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Read-only MCO review | PASS WITH FIXES | The review found a transition-state delete edge and an inherited unrestricted session-content read. Both received minimal guards and deterministic tests; speculative composer-seed and duplicate-runtime claims were rejected after tracing the selection guard and path lookup. |
 | Static architecture scan | PASS | No Electron dependency or host directories, `window.piBridge`, Browser Agent, or Channels implementation was introduced. |
 
+## Phase 4 verification (2026-08-14, Windows)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| `npm test` | PASS | Fourteen deterministic tests cover safe model normalization, secret-field exclusion, catalog grouping/filtering, ordered thinking levels, per-session model isolation, session selection, and Phase 2 event normalization. |
+| `npm run check` | PASS | The Pi model RPC adapter, session-owned model controller, auth metadata API, and React panel pass strict TypeScript. |
+| `npm run build:frontend` | PASS | 305 modules; 427.13 kB JavaScript and 28.76 kB CSS before gzip. |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | PASS WITH EXISTING WARNING | The inherited Windows-only unused `app` setup parameter remains; no new warning was introduced. |
+| `cargo test --lib --manifest-path src-tauri/Cargo.toml` | PASS | Eight Rust tests include isolated credential removal, metadata-only serialization, provider validation, and preservation of malformed or non-object auth files. No real credential was removed. |
+| `npm audit --omit=dev` | PASS | Zero production vulnerabilities. |
+| `npm run gate:models-real` | PASS | Real Pi 0.84.2 returned 355 models; the gate switched `deepseek-v4-flash` to `deepseek-v4-pro`, restored it, changed/restored supported thinking levels, and confirmed the requested model in a fresh Pi process without sending a prompt. |
+| Real Windows model UI | PASS | Search/provider grouping, GPT-5.6 Sol/max → DeepSeek V4 Flash/low → restore, cross-session DeepSeek/off isolation, and resume after a full Tauri restart were exercised against real Pi RPC state. |
+| Authentication boundary | PASS WITH DOCUMENTED LIMIT | The UI rendered provider names, credential type/source, model counts, refresh, explicit removal confirmation, and `/login` guidance without displaying tokens, headers, endpoints, or auth-file contents. Pi RPC 0.84.2 does not expose interactive login, so no Electron/Node auth host was added. |
+| Windows process lifecycle | PASS WITH FIX | Live testing exposed `.cmd`/Volta descendants surviving a single-process kill. The owned PID tree is now terminated on stop/close; two active session runtimes fell to zero after the patched window closed. |
+| Read-only MCO Scout | PASS WITH MANUAL VERIFICATION | The scoped model/auth inventory used `pi:deepseek/deepseek-v4-flash`; command names and login limitations were checked against the installed Pi 0.84.2 RPC docs/source before implementation. |
+| Static architecture scan | PASS | No Electron dependency or host directories, `window.piBridge`, Browser Agent, Channels, managed runtime, files, or terminal UI was introduced. |
+
 ## Migration decisions
 
 | Feature | DLYZZT source | Gustav source | Strategy | Priority | Risk | Verification |
@@ -74,7 +91,7 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Chat composer and timeline | React chat components | `src/components/chat-view*`, `src/rpc/bridge.ts` | ADAPT | P0 | High | Phase 2 real streaming gate; no mock transport. |
 | Pi 0.84.2 event normalization | Electron agent host contracts | Current RPC event stream | REWRITE_MINIMAL | P0 | High | Delta-only `message_update`, strict LF JSONL, tool and abort tests. |
 | Sessions and history | Session contracts and presentation ideas | Rust session commands and Lit session browser | ADAPT | P0 | Medium | Phase 3 deterministic race tests, real session RPC gate, isolated Windows UI flows, and process-cleanup check. |
-| Models, providers, and authentication | React presentation ideas | Rust auth/model commands | ADAPT | P1 | Medium | Phase 4 provider discovery and login/logout diagnostics. |
+| Models, providers, and authentication | React presentation ideas | Rust auth/provider discovery plus Pi model RPC | ADAPT | P1 | Medium | Phase 4 safe catalog tests, isolated auth-file tests, real model/thinking gate, restart/session isolation, and Windows UI checks. |
 | File browsing and editing | React file UI ideas | Tauri fs/dialog plugins and file viewer | ADAPT | P1 | Medium | Phase 5 open/save plus capability-scope checks. |
 | Terminal, git, and worktrees | React presentation ideas | Shell capability allow-list and Rust git commands | ADAPT | P1 | High | Phase 6 shell lifecycle, git status, and worktree safety tests. |
 | Pi packages, extensions, skills, and prompts | Exclude Electron host implementations | Existing CLI/package commands and extension UI | ADAPT | P1 | Medium | Phase 7 real list/install/remove/update flows. |
@@ -82,4 +99,4 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Electron main, preload, and agent host | `src/main`, `src/preload`, `src/agent-host` | None | DROP | P0 | Low | Static scan contains no Electron dependency or host bootstrap. |
 | Browser Agent and Channels | Browser and Channels trees | None | DROP | P0 | Low | Static scan contains no Browser Agent or Channels source. |
 
-Phase 3 adds explicit workspace-scoped session discovery, one isolated Pi runtime per opened session, list/new/resume/switch/rename/delete/fork workflows, persisted message hydration, stale-selection rejection, and a real restart gate. It does not introduce model/auth management, files, terminal/git, package management, Electron host code, or mock Pi behavior.
+Phase 4 adds a safe model catalog, provider grouping/search, per-session model and thinking controls, credential metadata, explicit stored-credential removal, and manual Pi TUI login guidance. Full model objects are reduced before entering React state so provider headers, endpoints, and credential material are not retained. Interactive login remains outside the GUI because Pi RPC 0.84.2 does not expose it; adding DLYZZT's Electron/Node auth host is explicitly out of scope. Files, terminal/git, package management, managed runtime, Browser Agent, Channels, and mock Pi behavior remain absent.
