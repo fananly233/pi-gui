@@ -9,6 +9,99 @@ export type DesktopRuntimeInfo = Readonly<{
 	version: string;
 }>;
 
+export type PiRuntimeMode = "managed" | "system";
+
+export type InstalledPiRuntime = Readonly<{
+	version: string;
+	executable: string;
+	asset: string;
+	sha256: string;
+	installedAt: number;
+	current: boolean;
+}>;
+
+export type PiRuntimeStatus = Readonly<{
+	mode: PiRuntimeMode;
+	effectiveSource: "managed" | "bundled" | "system" | "unavailable" | string;
+	managed: boolean;
+	fallback: boolean;
+	currentVersion: string | null;
+	latestVersion: string | null;
+	updateAvailable: boolean;
+	executable: string | null;
+	systemPiPath: string | null;
+	installedVersions: InstalledPiRuntime[];
+	operationActive: boolean;
+	activeRpcCount: number;
+	note: string | null;
+	releaseNotes: string | null;
+	releaseUrl: string | null;
+	publishedAt: string | null;
+}>;
+
+type NativeInstalledPiRuntime = Readonly<{
+	version: string;
+	executable: string;
+	asset: string;
+	sha256: string;
+	installed_at: number;
+	current: boolean;
+}>;
+
+type NativePiRuntimeStatus = Readonly<{
+	mode: PiRuntimeMode;
+	effective_source: string;
+	managed: boolean;
+	fallback: boolean;
+	current_version: string | null;
+	latest_version: string | null;
+	update_available: boolean;
+	executable: string | null;
+	system_pi_path: string | null;
+	installed_versions: NativeInstalledPiRuntime[];
+	operation_active: boolean;
+	active_rpc_count: number;
+	note: string | null;
+	release_notes: string | null;
+	release_url: string | null;
+	published_at: string | null;
+}>;
+
+export type PiRuntimeLogEntry = Readonly<{
+	timestamp_ms: number;
+	level: string;
+	event: string;
+	detail: string;
+}>;
+
+export type PiRuntimeDiagnostics = Readonly<{
+	runtimeRoot: string;
+	settingsPath: string;
+	logPath: string;
+	activeRpcCount: number;
+	activeTerminalCount: number;
+	operationActive: boolean;
+	installedVersions: InstalledPiRuntime[];
+	logs: PiRuntimeLogEntry[];
+}>;
+
+type NativePiRuntimeDiagnostics = Readonly<{
+	runtime_root: string;
+	settings_path: string;
+	log_path: string;
+	active_rpc_count: number;
+	active_terminal_count: number;
+	operation_active: boolean;
+	installed_versions: NativeInstalledPiRuntime[];
+	logs: PiRuntimeLogEntry[];
+}>;
+
+export type ManagedPiInstallResult = Readonly<{
+	version: string;
+	executable: string;
+	already_installed: boolean;
+}>;
+
 export type DesktopSessionInfo = Readonly<{
 	id: string;
 	name: string | null;
@@ -240,9 +333,71 @@ function mapGitWorktree(worktree: NativeGitWorktree): GitWorktree {
 	};
 }
 
+function mapInstalledPiRuntime(runtime: NativeInstalledPiRuntime): InstalledPiRuntime {
+	return {
+		version: runtime.version,
+		executable: runtime.executable,
+		asset: runtime.asset,
+		sha256: runtime.sha256,
+		installedAt: runtime.installed_at,
+		current: runtime.current,
+	};
+}
+
+function mapPiRuntimeStatus(status: NativePiRuntimeStatus): PiRuntimeStatus {
+	return {
+		mode: status.mode,
+		effectiveSource: status.effective_source,
+		managed: status.managed,
+		fallback: status.fallback,
+		currentVersion: status.current_version,
+		latestVersion: status.latest_version,
+		updateAvailable: status.update_available,
+		executable: status.executable,
+		systemPiPath: status.system_pi_path,
+		installedVersions: status.installed_versions.map(mapInstalledPiRuntime),
+		operationActive: status.operation_active,
+		activeRpcCount: status.active_rpc_count,
+		note: status.note,
+		releaseNotes: status.release_notes,
+		releaseUrl: status.release_url,
+		publishedAt: status.published_at,
+	};
+}
+
 export const desktopApi = {
 	getRuntimeInfo(): Promise<DesktopRuntimeInfo> {
 		return invoke<DesktopRuntimeInfo>("get_desktop_runtime_info");
+	},
+
+	async getPiRuntimeStatus(checkUpdates = false): Promise<PiRuntimeStatus> {
+		return mapPiRuntimeStatus(await invoke<NativePiRuntimeStatus>("get_pi_runtime_status", { checkUpdates }));
+	},
+
+	setPiRuntimeSettings(mode: PiRuntimeMode, systemPiPath: string | null): Promise<{ mode: PiRuntimeMode; system_pi_path: string | null }> {
+		return invoke("set_pi_runtime_settings", { mode, systemPiPath });
+	},
+
+	installManagedPiRuntime(): Promise<ManagedPiInstallResult> {
+		return invoke<ManagedPiInstallResult>("install_managed_pi_runtime");
+	},
+
+	activateManagedPiRuntime(version: string): Promise<ManagedPiInstallResult> {
+		return invoke<ManagedPiInstallResult>("activate_managed_pi_runtime", { version });
+	},
+
+	async getPiRuntimeDiagnostics(): Promise<PiRuntimeDiagnostics> {
+		const diagnostics = await invoke<NativePiRuntimeDiagnostics>("get_pi_runtime_diagnostics");
+		return {
+			runtimeRoot: diagnostics.runtime_root,
+			settingsPath: diagnostics.settings_path,
+			logPath: diagnostics.log_path,
+			activeRpcCount: diagnostics.active_rpc_count,
+			activeTerminalCount: diagnostics.active_terminal_count,
+			operationActive: diagnostics.operation_active,
+			installedVersions: diagnostics.installed_versions.map(mapInstalledPiRuntime),
+			logs: diagnostics.logs,
+		};
 	},
 
 	async listSessions(): Promise<DesktopSessionInfo[]> {

@@ -91,10 +91,12 @@ Authentication remains owned by Pi:
 ## Onboarding + update flow
 
 ### First run
-If `pi` is not available, Pi Desktop shows an onboarding card with install command and retry flow.
+Managed mode first resolves a verified version under the Desktop app-data directory, then a packaged sidecar, and finally an existing system Pi as a non-mutating fallback. The Runtime panel can install the matching standalone release after an explicit confirmation, or select an advanced system executable validated by the native layer.
 
 ### Update flow
-Pi Desktop checks current/latest CLI version and can surface update affordances in settings/sidebar.
+Release checks are manual and lazy: opening the Runtime panel reads only local state, while **Check updates** queries the fixed `earendil-works/pi` latest-release endpoint. Install/update verifies the exact published SHA-256, constrains archive extraction, runs a bounded `pi --version`, and transactionally activates the version. Previous versions remain available for rollback. No global npm package or PATH entry is changed.
+
+Runtime maintenance is serialized and refused while Pi RPC sessions are active. Interrupted staging directories carry owner locks and are removed on startup only when abandoned. Diagnostics expose bounded lifecycle metadata, paths, versions, and process counts; prompts, model output, credentials, and environment variables are not logged.
 
 ---
 
@@ -111,4 +113,4 @@ Pi Desktop checks current/latest CLI version and can surface update affordances 
 
 Tauri permissions are declared in `src-tauri/capabilities/default.json`.
 
-Important: this app intentionally needs shell/fs access to operate as a local coding agent host. Validate this against your environment policy before deployment.
+Important: native terminal, workspace, package, and runtime operations are exposed through typed Rust commands. The renderer cannot supply arbitrary runtime executable arguments or environment variables, and it has no generic shell-process bridge. Validate the declared capabilities against your environment policy before deployment.

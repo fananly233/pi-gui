@@ -133,6 +133,24 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Read-only MCO Scout | PASS WITH MANUAL CORRECTIONS | One scoped `pi:deepseek/deepseek-v4-flash` Scout informed the boundary. Installed Pi source disproved its stale flat command-field assumption and its blanket no-`--approve` recommendation; implementation follows real 0.84.2 `sourceInfo` and project-write requirements. |
 | Static architecture scan | PASS | No Electron dependency/host, `window.piBridge`, Browser Agent, Channels, generic Pi CLI handler, or renderer shell process capability was introduced. |
 
+## Phase 8 verification (2026-08-14, Windows)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| `npm test` | PASS | Nineteen deterministic renderer tests from Phases 2–7 remain green; no mock runtime installer was introduced. |
+| `npm run check` | PASS | Runtime status/settings/install/activate/diagnostics types, the lazy React panel, and the hardened RPC start contract pass strict TypeScript. |
+| `npm run build:frontend` | PASS | 320 modules. The main bundle is 464.73 kB, the lazy runtime chunk is 9.08 kB, and the unchanged lazy terminal chunk is 333.94 kB before gzip. |
+| `cargo check --locked --manifest-path src-tauri/Cargo.toml` | PASS | The committed lockfile pins the tested Tauri 2.10 runtime/plugin graph; no Rust diagnostic was emitted. `aws-lc-rs` is absent from the graph. |
+| `cargo test --locked --manifest-path src-tauri/Cargo.toml --lib` | PASS | Twenty-three Rust tests cover runtime asset mapping, exact checksums, archive traversal rejection, transactional rollback pointers, bounded single-line logs, abandoned-staging locks, and the earlier native bridges. One networked gate remains ignored by default. |
+| `npm run gate:runtime-real` | PASS | In an isolated temporary root, the latest official Windows x64 asset and `SHA256SUMS` were downloaded, SHA-256 verified, safely extracted, executed through `pi --version`, activated, and then reused by a second install. The temporary root was removed. |
+| `npm audit --omit=dev` | PASS | Zero production vulnerabilities. |
+| Real Windows runtime UI | PASS | The panel resolved the existing system Pi 0.84.2 fallback, displayed a local status without startup network polling, showed the explicit install confirmation, and returned to the unchanged state after Cancel. No managed version or active pointer was created. |
+| Diagnostics and recovery | PASS | The real panel showed app-data/settings/log paths and `0 RPC / 0 terminal`. A deliberately interrupted staging download was removed on the next startup only after its owner lock was free; `runtime_staging_cleaned` was recorded. |
+| Runtime lifecycle boundary | PASS | Runtime maintenance refuses active RPC sessions, RPC start refuses concurrent maintenance, settings are native-owned, WebView-supplied executable/environment fields were removed, and closing the verified app left no `pi-desktop` process. |
+| `npm run build` | PASS WITH LINKER INFO | Tauri produced a 16.60 MiB Windows x64 executable, a 5.74 MiB MSI, and a 4.00 MiB NSIS installer. Rust surfaced only the localized MSVC import-library linker message as `linker_messages`; bundling completed successfully. |
+| Read-only MCO Scout | PASS WITH MANUAL VERIFICATION | One scoped `pi:deepseek/deepseek-v4-flash` Scout informed release ownership, lifecycle, diagnostics, and rollback boundaries. Asset names, release metadata, Pi version behavior, and all security-sensitive paths were verified against the implementation and real gate. |
+| Static architecture scan | PASS | No Electron dependency/host, `window.piBridge`, Browser Agent, Channels, arbitrary runtime executable/environment input, global npm updater, or renderer shell process capability was introduced. |
+
 ## Migration decisions
 
 | Feature | DLYZZT source | Gustav source | Strategy | Priority | Risk | Verification |
@@ -149,10 +167,12 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | File browsing, editing, `@file`, and image attachments | React file UI ideas | Rust path helpers, native dialog, file-viewer semantics, and Pi image RPC | ADAPT | P1 | Medium | Phase 5 deterministic mention tests, Rust containment/save tests, and real Windows preview/attachment UI checks. |
 | Terminal, git, and worktrees | React presentation ideas | Native process/Git foundations | ADAPT | P1 | High | Real ConPTY test, typed Git status/diff, guarded worktree test, real Windows Git UI, and capability scan. |
 | Pi packages, extensions, skills, prompts, and themes | Exclude Electron host implementations | Existing CLI/package commands and extension UI concepts | ADAPT | P2 | Medium | Phase 7 typed bridge tests, isolated real Pi mutation gate, live `get_commands`, and Windows UI verification. |
-| Managed Pi runtime and release packaging | Bundled-tool concepts only | Existing Tauri sidecar discovery | DEFER | P2 | High | Phase 8 clean-machine install and upgrade gate. |
+| Managed Pi runtime and release packaging | Bundled-tool concepts only | Existing Tauri sidecar discovery | ADAPT | P2 | High | Locked builds, isolated official-release install/reuse gate, rollback tests, explicit-confirmation UI, startup recovery, and Windows MSI/NSIS bundle generation. |
 | Electron main, preload, and agent host | `src/main`, `src/preload`, `src/agent-host` | None | DROP | P0 | Low | Static scan contains no Electron dependency or host bootstrap. |
 | Browser Agent and Channels | Browser and Channels trees | None | DROP | P0 | Low | Static scan contains no Browser Agent or Channels source. |
 
 Phase 6 adds a lazy xterm surface backed by a managed native PTY, typed Git status and bounded diffs, and guarded worktree list/create/use/remove flows. It removes the inherited arbitrary Git command and broad renderer shell process capabilities. It does not add stage/commit/fetch/push/reset, force worktree deletion, an unrestricted destination picker, a complete IDE, package management, a managed runtime, Browser Agent, Channels, or mock Pi behavior.
 
 Phase 7 adds typed Pi package list/install/remove/update commands, live extension/plugin/skill/prompt discovery through each session's Pi RPC runtime, direct theme visibility, and command-to-composer staging. Pi remains the package-policy owner. It does not add a package marketplace, recommendations, package-specific settings, automatic command execution, a duplicate `pi config` implementation, managed runtime updates, Browser Agent, Channels, or mock ecosystem data.
+
+Phase 8 adds a versioned app-data-owned Pi runtime, fixed official-release discovery, exact SHA-256 verification, constrained extraction, transactional activation/rollback, explicit system-Pi fallback, lifecycle-only diagnostics, interrupted-install recovery, and locked Windows release bundles. It does not silently update Pi, mutate global npm/PATH, allow the WebView to choose executables or environments, install while a Pi RPC session is active, claim code signing/notarization, or treat bundle generation as a clean-machine installer test.

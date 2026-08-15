@@ -1,14 +1,14 @@
 # Pi CLI → Pi Desktop Feature Mapping
 
-This document describes the code that exists on `feat/tauri-react-migration` after Phase 7. It intentionally does not count inherited Gustav UI claims that are not present in the React renderer.
+This document describes the code that exists on `feat/tauri-react-migration` after Phase 8. It intentionally does not count inherited Gustav UI claims that are not present in the React renderer.
 
 ## Foundation
 
 | Pi capability | Desktop status |
 | --- | --- |
 | `pi --mode rpc` JSONL protocol | ✅ Rust owns one process per loaded session; the React `PiAdapter` correlates strict LF-delimited requests and events. |
-| Pi discovery | ✅ Bundled sidecar → PATH/common locations, with an explicit settings/environment override supported by the existing native runtime. |
-| Process lifecycle | ✅ RPC, terminal, and package-operation children are owned and stopped on window/application exit. |
+| Pi discovery | ✅ Desktop-managed version → bundled sidecar → existing system Pi fallback. Advanced system mode accepts a native-validated executable path or PATH discovery. |
+| Process lifecycle | ✅ RPC, terminal, and package-operation children are owned and stopped on window/application exit; runtime maintenance is serialized and refuses active RPC sessions. |
 | Electron host/preload | ❌ Deliberately absent. Tauri commands are the native boundary. |
 
 ## Chat and Agent Loop
@@ -89,9 +89,22 @@ Package operations are serialized, capped at 512 KiB of captured output, limited
 | Rust runtime proof | ✅ Platform, architecture, and version are displayed from Tauri. |
 | Browser Agent / Channels | ❌ Explicitly dropped from this product boundary. |
 
-## Deferred to Phase 8
+## Desktop Runtime
 
-- Managed Pi runtime installation and ownership.
-- Correct fork-aware Pi package identity and self-update behavior.
-- Clean-machine packaging, upgrades, rollback, and release verification.
-- Final product branding/versioning.
+| Capability | Desktop status |
+| --- | --- |
+| Runtime ownership | ✅ Versioned standalone Pi binaries live only under the app-data `pi-runtime/versions` directory. Desktop never changes global npm packages or PATH. |
+| Official release discovery | ✅ Manual checks use the fixed `earendil-works/pi` latest-release API and select only the exact OS/architecture asset. No startup polling is added. |
+| Verified install/update | ✅ The matching asset and `SHA256SUMS` are size-bounded, the exact SHA-256 is checked, archive paths and entry types are constrained, and the extracted binary must pass a bounded `pi --version`. |
+| Rollback | ✅ Previous verified versions remain installed; the active pointer is transactional and any installed version can be reactivated. |
+| System Pi mode | ✅ Explicit advanced fallback; Desktop validates and launches it but never updates or removes it. |
+| Diagnostics and logs | ✅ App-data/settings/log paths, active process counts, installed versions, and bounded lifecycle-only logs are visible. Prompts, outputs, credentials, and environment variables are excluded. |
+| Interrupted install recovery | ✅ Each staging directory has an owner lock. Startup removes only abandoned unlocked `.install-*` directories and leaves active/installed directories untouched. |
+| Release packaging | ✅ Windows x64 release build produces both MSI and NSIS bundles from the locked Rust graph. |
+| Silent/background update | ❌ Deliberately absent. Download/install and version switches require an explicit in-app confirmation and apply only to new sessions. |
+
+## Remaining release work
+
+- Execute installer/uninstaller and upgrade checks on clean Windows machines, plus equivalent macOS/Linux package gates.
+- Configure code signing/notarization and release-channel policy.
+- Finalize product branding, repository URLs, and versioning before public release.

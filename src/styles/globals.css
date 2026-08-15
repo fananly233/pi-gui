@@ -422,6 +422,31 @@ input:disabled {
 	cursor: pointer;
 }
 
+.sidebar__runtime .sidebar__runtime-trigger {
+	display: grid;
+	flex: 1;
+	gap: 2px;
+	min-width: 0;
+	margin: 0;
+	padding: 5px 0;
+	color: var(--text-muted);
+	text-align: left;
+}
+
+.sidebar__runtime-trigger span {
+	font-size: 10px;
+	font-weight: 750;
+}
+
+.sidebar__runtime-trigger small {
+	overflow: hidden;
+	color: var(--text-dim);
+	font-size: 8px;
+	font-weight: 500;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 .sessions-panel {
 	display: flex;
 	flex: 1;

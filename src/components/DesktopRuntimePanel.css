@@ -1,0 +1,347 @@
+.desktop-runtime-panel {
+	display: flex;
+	flex-basis: 440px;
+	flex-direction: column;
+}
+
+.desktop-runtime-panel__body {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 12px;
+	min-height: 0;
+	padding: 12px;
+	overflow-y: auto;
+}
+
+.desktop-runtime-panel__message {
+	margin: 10px 12px 0;
+	padding: 9px 10px;
+	color: var(--success, #49835d);
+	font-size: 10px;
+	background: color-mix(in srgb, var(--success, #49835d) 10%, var(--bg-panel));
+	border: 1px solid color-mix(in srgb, var(--success, #49835d) 30%, var(--border));
+	border-radius: 7px;
+}
+
+.runtime-hero,
+.runtime-section {
+	padding: 13px;
+	background: color-mix(in srgb, var(--bg-hover) 45%, var(--bg-panel));
+	border: 1px solid var(--border);
+	border-radius: 10px;
+}
+
+.runtime-hero {
+	display: grid;
+	gap: 10px;
+}
+
+.runtime-hero__title {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.runtime-hero__title h3,
+.runtime-section h3 {
+	margin: 0;
+	color: var(--text);
+	font-size: 11px;
+}
+
+.runtime-hero__title strong {
+	display: block;
+	margin-top: 3px;
+	color: var(--text-muted);
+	font-size: 10px;
+	font-weight: 650;
+}
+
+.runtime-hero p,
+.runtime-section p {
+	margin: 0;
+	color: var(--text-muted);
+	font-size: 10px;
+	line-height: 1.5;
+}
+
+.runtime-hero > code {
+	display: block;
+	padding: 7px 8px;
+	overflow: hidden;
+	color: var(--text-dim);
+	font-size: 9px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+}
+
+.runtime-hero__actions {
+	display: flex;
+	gap: 7px;
+}
+
+.runtime-hero__actions .button {
+	flex: 1;
+	min-width: 0;
+	font-size: 9px;
+}
+
+.runtime-hero > small {
+	color: var(--danger);
+	font-size: 9px;
+	line-height: 1.4;
+}
+
+.runtime-section {
+	display: grid;
+	gap: 10px;
+}
+
+.runtime-section > header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.runtime-section > header > span {
+	color: var(--text-dim);
+	font-size: 9px;
+}
+
+.runtime-section button,
+.runtime-section select,
+.runtime-section input {
+	min-height: 29px;
+	color: var(--text);
+	font: inherit;
+	font-size: 9px;
+	background: var(--bg-panel);
+	border: 1px solid var(--border-strong);
+	border-radius: 6px;
+}
+
+.runtime-section button {
+	padding: 0 9px;
+	font-weight: 750;
+	cursor: pointer;
+}
+
+.runtime-section button:hover:not(:disabled) {
+	color: var(--accent);
+	border-color: var(--accent-border);
+}
+
+.runtime-section button:disabled,
+.runtime-hero button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.runtime-settings label {
+	display: grid;
+	gap: 5px;
+}
+
+.runtime-settings label > span {
+	color: var(--text-muted);
+	font-size: 9px;
+	font-weight: 700;
+}
+
+.runtime-settings select,
+.runtime-settings input {
+	width: 100%;
+	padding: 0 8px;
+	outline: 0;
+}
+
+.runtime-settings select:focus,
+.runtime-settings input:focus {
+	border-color: var(--accent-border);
+	box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.runtime-release details {
+	color: var(--text-muted);
+	font-size: 9px;
+}
+
+.runtime-release summary {
+	cursor: pointer;
+}
+
+.runtime-release pre {
+	max-height: 220px;
+	margin: 8px 0 0;
+	padding: 9px;
+	overflow: auto;
+	color: var(--text-muted);
+	font: 9px/1.5 "SFMono-Regular", Consolas, monospace;
+	white-space: pre-wrap;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+}
+
+.runtime-versions ul,
+.runtime-log-list {
+	padding: 0;
+	margin: 0;
+	list-style: none;
+}
+
+.runtime-versions li {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 8px 0;
+	border-top: 1px solid var(--border);
+}
+
+.runtime-versions li:first-child {
+	padding-top: 0;
+	border-top: 0;
+}
+
+.runtime-versions li div {
+	min-width: 0;
+}
+
+.runtime-versions li strong,
+.runtime-versions li span {
+	display: block;
+}
+
+.runtime-versions li strong {
+	font-size: 10px;
+}
+
+.runtime-versions li span {
+	margin-top: 3px;
+	overflow: hidden;
+	color: var(--text-dim);
+	font-size: 8px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.runtime-versions li em {
+	color: var(--accent);
+	font-size: 8px;
+	font-style: normal;
+	font-weight: 750;
+	text-transform: uppercase;
+}
+
+.runtime-diagnostics__content {
+	display: grid;
+	gap: 10px;
+}
+
+.runtime-diagnostics dl {
+	display: grid;
+	gap: 5px;
+	margin: 0;
+}
+
+.runtime-diagnostics dl div {
+	display: grid;
+	grid-template-columns: 76px minmax(0, 1fr);
+	gap: 8px;
+}
+
+.runtime-diagnostics dt {
+	color: var(--text-dim);
+	font-size: 8px;
+	text-transform: uppercase;
+}
+
+.runtime-diagnostics dd {
+	margin: 0;
+	overflow-wrap: anywhere;
+	color: var(--text-muted);
+	font: 8px/1.45 "SFMono-Regular", Consolas, monospace;
+}
+
+.runtime-log-list {
+	display: grid;
+	gap: 5px;
+	max-height: 260px;
+	padding: 7px;
+	overflow: auto;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+}
+
+.runtime-log-list li {
+	display: grid;
+	grid-template-columns: 62px 108px minmax(0, 1fr);
+	gap: 6px;
+	font-size: 8px;
+	line-height: 1.4;
+}
+
+.runtime-log-list time,
+.runtime-log-list span {
+	color: var(--text-dim);
+}
+
+.runtime-log-list strong {
+	overflow: hidden;
+	color: var(--text-muted);
+	text-overflow: ellipsis;
+}
+
+.runtime-confirmation {
+	position: absolute;
+	inset: 0;
+	z-index: 30;
+	display: grid;
+	place-items: center;
+	padding: 18px;
+	background: color-mix(in srgb, var(--bg) 78%, transparent);
+	backdrop-filter: blur(5px);
+}
+
+.runtime-confirmation section {
+	display: grid;
+	gap: 11px;
+	width: min(340px, 100%);
+	padding: 17px;
+	background: var(--bg-panel);
+	border: 1px solid var(--border-strong);
+	border-radius: 11px;
+	box-shadow: 0 18px 50px rgb(31 24 17 / 22%);
+}
+
+.runtime-confirmation h3,
+.runtime-confirmation p {
+	margin: 0;
+}
+
+.runtime-confirmation h3 {
+	font-size: 13px;
+}
+
+.runtime-confirmation section > p:not(.eyebrow) {
+	color: var(--text-muted);
+	font-size: 10px;
+	line-height: 1.55;
+}
+
+.runtime-confirmation section > div {
+	display: flex;
+	justify-content: flex-end;
+	gap: 7px;
+}
+
+.runtime-confirmation .button {
+	font-size: 9px;
+}

@@ -10,6 +10,7 @@ import { SessionSidebar } from "./SessionSidebar";
 import { TitleBar } from "./TitleBar";
 
 const TerminalPanel = lazy(async () => ({ default: (await import("./TerminalPanel")).TerminalPanel }));
+const DesktopRuntimePanel = lazy(async () => ({ default: (await import("./DesktopRuntimePanel")).DesktopRuntimePanel }));
 
 export type RuntimeState =
 	| { status: "loading" }
@@ -26,9 +27,9 @@ type AppShellProps = {
 	chat: PiChatController;
 };
 
-export type WorkspaceTool = "files" | "git" | "terminal" | "ecosystem";
+export type WorkspaceTool = "files" | "git" | "terminal" | "ecosystem" | "runtime";
 
-function RuntimePanel({ state, onRetry }: { state: RuntimeState; onRetry: () => Promise<void> }) {
+function RuntimePanel({ state, onRetry, onOpen }: { state: RuntimeState; onRetry: () => Promise<void>; onOpen: () => void }) {
 	if (state.status === "loading") return <span>Checking Rust bridge…</span>;
 	if (state.status === "error") {
 		return (
@@ -38,7 +39,12 @@ function RuntimePanel({ state, onRetry }: { state: RuntimeState; onRetry: () => 
 			</>
 		);
 	}
-	return <span title={`${state.info.platform} / ${state.info.arch}`}>Tauri v{state.info.version}</span>;
+	return (
+		<button type="button" className="sidebar__runtime-trigger" onClick={onOpen} title={`${state.info.platform} / ${state.info.arch} · Pi runtime settings`}>
+			<span>Pi Runtime</span>
+			<small>Manage · Desktop v{state.info.version}</small>
+		</button>
+	);
 }
 
 export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorkspacePathChange, onChooseWorkspace, onConnect, chat }: AppShellProps) {
@@ -150,7 +156,7 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 
 					<div className={`sidebar__runtime sidebar__runtime--${runtimeState.status}`}>
 						<span className={`status-dot status-dot--${runtimeState.status}`} aria-hidden="true" />
-						<RuntimePanel state={runtimeState} onRetry={onRetryRuntime} />
+						<RuntimePanel state={runtimeState} onRetry={onRetryRuntime} onOpen={() => toggleTool("runtime")} />
 					</div>
 				</aside>
 
@@ -213,6 +219,11 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 							onUseCommand={useEcosystemCommand}
 							onClose={() => setActiveTool(null)}
 						/>
+					) : null}
+					{activeTool === "runtime" ? (
+						<Suspense fallback={<aside className="workspace-tool-panel desktop-runtime-panel"><div className="tool-panel__empty">Loading runtime manager…</div></aside>}>
+							<DesktopRuntimePanel onClose={() => setActiveTool(null)} />
+						</Suspense>
 					) : null}
 				</main>
 			</div>

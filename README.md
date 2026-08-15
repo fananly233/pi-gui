@@ -25,7 +25,7 @@ Exact source revisions, licenses, and modification boundaries are recorded in [T
 
 ## Current migration status
 
-The active React renderer currently implements **Phase 6: Terminal / Git / Worktree**. It includes the real Pi chat path, isolated sessions, model/auth workflows, workspace-scoped files and attachments, a managed native PTY with xterm, typed Git status/diffs, and guarded worktree workflows. Package management and the managed runtime remain later migration phases. Feature inventories below describe the Gustav upstream baseline and migration targets; they are not all exposed by the current React UI yet.
+The active React renderer now implements the migration through **Phase 8: Desktop Runtime**. It includes the real Pi chat path, isolated sessions, model/auth workflows, workspace-scoped files and attachments, a managed native PTY with xterm, typed Git/worktree workflows, Pi ecosystem management, and a verified app-data-owned Pi runtime with explicit system fallback and rollback. Clean-machine installer testing, signing/notarization, final branding, and public release setup remain release work.
 
 <img width="1227" height="869" alt="Screenshot 2026-03-28 at 23 28 39" src="https://github.com/user-attachments/assets/0c15a79f-870c-44a0-9489-4b0d2d577e76" />
 
@@ -169,19 +169,12 @@ chmod +x Pi.Desktop_<version>_amd64.AppImage
 
 ## First run
 
-On launch, Pi Desktop checks for the `pi` CLI.
+Open **Pi Runtime** from the workspace sidebar. Managed mode is the default:
 
-If it is missing, the app shows an onboarding card with install instructions:
-
-```bash
-npm install -g @mariozechner/pi-coding-agent
-```
-
-Notes:
-- This installs a **public npm package** (`@mariozechner/pi-coding-agent`), so no npm auth token is required for normal users.
-- Pi Desktop itself is distributed via **GitHub Releases** (not npm).
-
-Then click **Retry** in-app.
+- If a verified Desktop-managed Pi version exists, new sessions use it.
+- Otherwise, an existing system Pi is used as a non-mutating fallback.
+- **Install managed Pi** shows an explicit confirmation before downloading the matching `earendil-works/pi` release, verifying its published SHA-256 checksum, and activating it under the app-data directory.
+- Advanced system mode can validate a specific executable or use PATH discovery. Pi Desktop never updates or removes that system installation and never changes global npm packages or PATH.
 
 ---
 
@@ -208,14 +201,16 @@ npm run build:frontend
 npm run tauri build
 ```
 
-### Phase 2–6 verification
+### Phase 2–8 verification
 
 ```bash
 npm test
 npm run gate:pi-real
 npm run gate:sessions-real
 npm run gate:models-real
-cargo test --manifest-path src-tauri/Cargo.toml
+npm run gate:ecosystem-real
+npm run gate:runtime-real
+cargo test --locked --manifest-path src-tauri/Cargo.toml
 ```
 
 `gate:pi-real` starts the installed Pi CLI in real RPC mode with `--no-session`. It defaults to `deepseek/deepseek-v4-flash` and can be redirected with `PI_GUI_GATE_PROVIDER`, `PI_GUI_GATE_MODEL`, and `PI_GUI_GATE_CWD`.
@@ -223,6 +218,10 @@ cargo test --manifest-path src-tauri/Cargo.toml
 `gate:sessions-real` uses an isolated temporary session directory and proves new, rename, history restore, fork, switch/resume, persistence, and resume after a real Pi process restart. A caller-supplied `PI_GUI_GATE_SESSION_DIR` is always preserved; set `PI_GUI_GATE_KEEP_SESSIONS=1` to retain an automatically created test directory.
 
 `gate:models-real` uses `--no-session`, sends no prompt, and verifies the real model catalog, model switching/restoration, supported thinking levels, and a fresh Pi process restart. It uses the same `PI_GUI_GATE_PROVIDER`, `PI_GUI_GATE_MODEL`, and `PI_GUI_GATE_CWD` overrides as the chat gate.
+
+`gate:ecosystem-real` exercises Pi package operations and runtime-discovered commands inside isolated user/project roots without changing the real Pi settings file.
+
+`gate:runtime-real` downloads the current official standalone asset into an isolated temporary runtime root, verifies `SHA256SUMS`, safely extracts it, runs `pi --version`, and proves that a second install reuses the verified version. It does not install into the application's real data directory or modify the system Pi.
 
 Artifacts are generated under:
 

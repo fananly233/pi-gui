@@ -8,7 +8,7 @@ This repository is a derivative work. The repository-level license remains MIT a
 - Base revision: `5d698433864fbebafa24e141da0ea56297766cfe`
 - License: MIT (`LICENSE`)
 - Use in this repository: Tauri 2 application structure, Rust commands, Pi RPC lifecycle, native capabilities, terminal/Git foundations, assets, and the initial frontend baseline.
-- Modifications: the renderer is being migrated from Lit to React while preserving the Rust/Tauri runtime boundary. Phase 6 replaces broad renderer shell/Git entry points with a managed native PTY and typed Git/worktree commands.
+- Modifications: the renderer was migrated from Lit to React while preserving the Rust/Tauri runtime boundary. Later phases add typed chat/session/model/file/ecosystem bridges, replace broad renderer shell/Git entry points with a managed native PTY and typed Git/worktree commands, and add a versioned Desktop-owned Pi runtime manager.
 
 ## DLYZZT Pi Desktop
 
@@ -32,3 +32,9 @@ This repository is a derivative work. The repository-level license remains MIT a
 - xterm.js: <https://github.com/xtermjs/xterm.js>, packages `@xterm/xterm` 6.0.0 and `@xterm/addon-fit` 0.11.0, MIT.
 - portable-pty: <https://github.com/wezterm/wezterm>, crate `portable-pty` 0.9.0, MIT.
 - Use in this repository: terminal emulation, fit-to-panel behavior, and native cross-platform PTY ownership. Pi Desktop's React/Rust lifecycle and security boundary are project modifications, not upstream xterm.js or portable-pty features.
+
+## Pi standalone runtime
+
+- Source and release assets: <https://github.com/earendil-works/pi>
+- Use in this repository: Phase 8 can download the exact platform/architecture standalone release on explicit user request, verify the accompanying published SHA-256 checksum, and store versioned binaries under the application's data directory.
+- Distribution boundary: no Pi standalone binary is committed to or bundled by this repository. Downloaded runtime artifacts remain separate upstream software; Pi Desktop's downloader, extraction guards, activation pointers, rollback, diagnostics, and lifecycle integration are project modifications.
