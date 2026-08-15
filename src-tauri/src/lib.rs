@@ -71,6 +71,23 @@ fn normalize_instance_id(instance_id: Option<String>) -> String {
 fn stop_rpc_instance(handle: &mut RpcProcessHandle) {
     handle.stdin_writer = None;
     if let Some(mut child) = handle.process.take() {
+        #[cfg(target_os = "windows")]
+        {
+            // npm/Volta .cmd shims create descendants that survive killing only
+            // the process represented by std::process::Child. Terminate the exact
+            // owned PID tree so credentials and RPC workers cannot outlive Tauri.
+            use std::os::windows::process::CommandExt;
+            let _ = Command::new("taskkill.exe")
+                .arg("/PID")
+                .arg(child.id().to_string())
+                .arg("/T")
+                .arg("/F")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .creation_flags(0x08000000) // CREATE_NO_WINDOW
+                .status();
+        }
         let _ = child.kill();
         let _ = child.wait();
     }
