@@ -1,3 +1,5 @@
+mod desktop_runtime;
+
 use portable_pty::{native_pty_system, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -106,6 +108,30 @@ fn stop_rpc_instance(handle: &mut RpcProcessHandle) {
     }
 }
 
+fn active_rpc_count(state: &RpcState) -> Result<usize, String> {
+    let mut instances = state
+        .instances
+        .lock()
+        .map_err(|_| "Failed to acquire RPC instances lock".to_string())?;
+    let mut active = 0;
+    for handle in instances.values_mut() {
+        let running = match handle.process.as_mut() {
+            Some(child) => match child.try_wait() {
+                Ok(None) => true,
+                Ok(Some(_)) | Err(_) => false,
+            },
+            None => false,
+        };
+        if running {
+            active += 1;
+        } else {
+            handle.process = None;
+            handle.stdin_writer = None;
+        }
+    }
+    Ok(active)
+}
+
 struct TerminalProcessHandle {
     pid: Option<u32>,
     writer: Option<Box<dyn Write + Send>>,
@@ -203,28 +229,22 @@ struct TerminalStartResult {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(deny_unknown_fields)]
 struct RpcStartOptions {
-    /// Dev-mode only: path to the CLI JS file (e.g. "../coding-agent/dist/cli.js").
-    /// When null/empty, the backend discovers the pi binary automatically.
-    cli_path: Option<String>,
-    /// Optional explicit pi binary path override from Desktop settings.
-    /// When set, this takes precedence over sidecar/PATH/common-location discovery.
-    pi_path: Option<String>,
     cwd: String,
     provider: Option<String>,
     model: Option<String>,
-    env: Option<std::collections::HashMap<String, String>>,
 }
 
 /// How the pi process was resolved
 #[derive(Debug, Clone)]
 enum PiProcess {
-    /// Dev mode: node <script> --mode rpc
-    DevNode { script: String },
+    /// Versioned standalone binary owned by Pi Desktop.
+    ManagedBinary { path: PathBuf, version: String },
     /// Packaged sidecar binary bundled with the desktop app
-    SidecarBinary { path: std::path::PathBuf },
+    SidecarBinary { path: PathBuf },
     /// Production/dev fallback: standalone pi binary found on PATH
-    PathBinary { path: std::path::PathBuf },
+    PathBinary { path: PathBuf },
 }
 
 fn find_sidecar_in_dir(dir: &Path, expected_name: &str) -> Option<PathBuf> {
@@ -466,162 +486,6 @@ fn prepend_bin_dir_to_path(cmd: &mut Command, bin_dir: &Path) {
     }
 }
 
-fn discover_npm_path(pi: Option<&PiProcess>) -> Option<PathBuf> {
-    let npm = npm_executable();
-
-    if let Ok(path) = which::which(npm) {
-        return Some(path);
-    }
-
-    let mut candidates: Vec<PathBuf> = Vec::new();
-
-    if let Some(PiProcess::PathBinary { path }) = pi {
-        if let Some(parent) = path.parent() {
-            candidates.push(parent.join(npm));
-        }
-    }
-
-    if let Ok(home) = std::env::var("HOME") {
-        let home_dir = PathBuf::from(home);
-        candidates.push(home_dir.join(".nvm/versions/node/current/bin").join(npm));
-
-        let nvm_versions_dir = home_dir.join(".nvm/versions/node");
-        if let Ok(entries) = fs::read_dir(nvm_versions_dir) {
-            let mut version_dirs: Vec<PathBuf> = entries
-                .filter_map(|entry| {
-                    let path = entry.ok()?.path();
-                    if path.is_dir() {
-                        Some(path)
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            version_dirs.sort_by(|a, b| b.cmp(a));
-            for version_dir in version_dirs {
-                candidates.push(version_dir.join("bin").join(npm));
-            }
-        }
-
-        candidates.push(home_dir.join(".volta/bin").join(npm));
-        candidates.push(home_dir.join(".local/bin").join(npm));
-    }
-
-    candidates.push(PathBuf::from("/opt/homebrew/bin").join(npm));
-    candidates.push(PathBuf::from("/usr/local/bin").join(npm));
-    candidates.push(PathBuf::from("/usr/bin").join(npm));
-
-    candidates.into_iter().find(|candidate| candidate.is_file())
-}
-
-fn discover_npm_global_root(pi: Option<&PiProcess>) -> Option<PathBuf> {
-    let npm_path = discover_npm_path(pi)?;
-
-    let mut cmd = Command::new(&npm_path);
-    cmd.arg("root")
-        .arg("-g")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    if let Some(parent) = npm_path.parent() {
-        prepend_bin_dir_to_path(&mut cmd, parent);
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
-
-    let output = cmd.output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
-    let root = stdout
-        .lines()
-        .next()
-        .map(str::trim)
-        .filter(|line| !line.is_empty())?;
-
-    let path = PathBuf::from(root);
-    if path.is_dir() {
-        Some(path)
-    } else {
-        None
-    }
-}
-
-fn resolve_pi_changelog_candidates(pi: &PiProcess) -> Vec<PathBuf> {
-    let mut candidates: Vec<PathBuf> = Vec::new();
-
-    if let Ok(pkg_dir) = std::env::var("PI_PACKAGE_DIR") {
-        let trimmed = pkg_dir.trim();
-        if !trimmed.is_empty() {
-            candidates.push(PathBuf::from(trimmed).join("CHANGELOG.md"));
-        }
-    }
-
-    match pi {
-        PiProcess::DevNode { script } => {
-            let script_path = PathBuf::from(script);
-            if let Some(dist_dir) = script_path.parent() {
-                candidates.push(dist_dir.join("..").join("CHANGELOG.md"));
-            }
-        }
-        PiProcess::PathBinary { path } | PiProcess::SidecarBinary { path } => {
-            let mut binaries = vec![path.clone()];
-            if let Ok(canonical) = fs::canonicalize(path) {
-                binaries.push(canonical);
-            }
-            for binary in binaries {
-                if let Some(parent) = binary.parent() {
-                    candidates.push(
-                        parent
-                            .join("..")
-                            .join("lib")
-                            .join("node_modules")
-                            .join("@mariozechner")
-                            .join("pi-coding-agent")
-                            .join("CHANGELOG.md"),
-                    );
-                    candidates.push(
-                        parent
-                            .join("..")
-                            .join("node_modules")
-                            .join("@mariozechner")
-                            .join("pi-coding-agent")
-                            .join("CHANGELOG.md"),
-                    );
-                    candidates.push(
-                        parent
-                            .join("..")
-                            .join("..")
-                            .join("lib")
-                            .join("node_modules")
-                            .join("@mariozechner")
-                            .join("pi-coding-agent")
-                            .join("CHANGELOG.md"),
-                    );
-                }
-            }
-        }
-    }
-
-    if let Some(global_root) = discover_npm_global_root(Some(pi)) {
-        candidates.push(
-            global_root
-                .join("@mariozechner")
-                .join("pi-coding-agent")
-                .join("CHANGELOG.md"),
-        );
-    }
-
-    candidates
-}
-
 fn discover_pi_from_env_override() -> Option<PathBuf> {
     for key in ["PI_DESKTOP_PI_PATH", "PI_CLI_PATH"] {
         if let Ok(raw) = std::env::var(key) {
@@ -635,7 +499,7 @@ fn discover_pi_from_env_override() -> Option<PathBuf> {
 
 fn missing_pi_cli_error(additional: Option<String>) -> String {
     let mut message = String::from(
-        "Could not find the pi CLI.\n\nInstall it with:\n  npm install -g @mariozechner/pi-coding-agent\n\nThen restart the app.",
+        "Pi is not available. Open the Pi Runtime panel to install the managed runtime, or choose Advanced > Use system Pi.",
     );
     if let Some(extra) = additional {
         let trimmed = extra.trim();
@@ -647,76 +511,69 @@ fn missing_pi_cli_error(additional: Option<String>) -> String {
     message
 }
 
-/// Discover the pi binary. Strategy:
-/// 1. If pi_path is provided (Desktop manual override), use it
-/// 2. If cli_path is provided (dev mode), use node + script or explicit binary
-/// 3. Try explicit env override (PI_DESKTOP_PI_PATH / PI_CLI_PATH)
-/// 4. Try sidecar discovery (packaged app)
-/// 5. Try finding `pi` on PATH (globally installed CLI or standalone binary)
-/// 6. Try common install locations (for GUI app launches without shell PATH)
-/// 7. Fail with actionable error
-fn discover_pi(app: &AppHandle, options: &RpcStartOptions) -> Result<PiProcess, String> {
-    // Desktop manual override from settings
-    if let Some(ref pi_path) = options.pi_path {
-        let trimmed = pi_path.trim();
-        if !trimmed.is_empty() {
-            if let Some(path) = resolve_explicit_pi_path(trimmed) {
-                return Ok(PiProcess::PathBinary { path });
-            }
-            return Err(missing_pi_cli_error(Some(format!(
-                "Configured pi binary path was not found: {}",
-                trimmed
-            ))));
+fn discover_system_pi(
+    settings: &desktop_runtime::RuntimeSettings,
+) -> Result<Option<PiProcess>, String> {
+    if let Some(configured) = settings.system_pi_path.as_deref() {
+        if let Some(path) = resolve_explicit_pi_path(configured) {
+            return Ok(Some(PiProcess::PathBinary { path }));
         }
+        return Err(missing_pi_cli_error(Some(format!(
+            "Configured system Pi path was not found: {configured}"
+        ))));
     }
-
-    // Dev mode: cli_path explicitly provided
-    if let Some(ref cli_path) = options.cli_path {
-        let trimmed = cli_path.trim();
-        if !trimmed.is_empty() {
-            if trimmed.ends_with(".js") || trimmed.ends_with(".mjs") || trimmed.ends_with(".cjs") {
-                return Ok(PiProcess::DevNode {
-                    script: trimmed.to_string(),
-                });
-            }
-            if let Some(path) = resolve_explicit_pi_path(trimmed) {
-                return Ok(PiProcess::PathBinary { path });
-            }
-        }
-    }
-
-    // Explicit environment override
     if let Some(path) = discover_pi_from_env_override() {
-        return Ok(PiProcess::PathBinary { path });
+        return Ok(Some(PiProcess::PathBinary { path }));
     }
-
-    // Packaged app: bundled sidecar
-    if let Some(path) = discover_sidecar(app) {
-        return Ok(PiProcess::SidecarBinary { path });
-    }
-
-    // Fallback: pi on PATH
     if let Ok(path) = which::which("pi") {
-        return Ok(PiProcess::PathBinary { path });
+        return Ok(Some(PiProcess::PathBinary { path }));
+    }
+    if let Some(path) = discover_pi_from_common_locations() {
+        return Ok(Some(PiProcess::PathBinary { path }));
+    }
+    Ok(None)
+}
+
+/// Resolve the native runtime preference. Managed mode uses a versioned desktop-owned
+/// binary first, then a packaged sidecar, and only then a system fallback. System mode
+/// never mutates or wraps the user's installation.
+fn discover_pi(app: &AppHandle) -> Result<PiProcess, String> {
+    let settings = desktop_runtime::load_settings(app)?;
+    if settings.mode == desktop_runtime::RuntimeMode::Managed {
+        if let Some(managed) = desktop_runtime::resolve_managed_runtime(app)? {
+            return Ok(PiProcess::ManagedBinary {
+                path: managed.executable,
+                version: managed.version,
+            });
+        }
+        if let Some(path) = discover_sidecar(app) {
+            return Ok(PiProcess::SidecarBinary { path });
+        }
     }
 
-    // GUI launches on macOS often don't inherit shell PATH (e.g. nvm-managed node/npm bins)
-    if let Some(path) = discover_pi_from_common_locations() {
-        return Ok(PiProcess::PathBinary { path });
+    if let Some(system) = discover_system_pi(&settings)? {
+        return Ok(system);
     }
 
     Err(missing_pi_cli_error(None))
 }
 
+fn pi_discovery_label(pi: &PiProcess) -> String {
+    match pi {
+        PiProcess::ManagedBinary { version, .. } => format!("Managed Pi {version}"),
+        PiProcess::SidecarBinary { .. } => "Bundled Pi runtime".to_string(),
+        PiProcess::PathBinary { path } => {
+            format!("System Pi · {}", path.to_string_lossy())
+        }
+    }
+}
+
 /// Build a Command for the discovered pi process
 fn build_command(pi: &PiProcess, options: &RpcStartOptions) -> Command {
     let mut cmd = match pi {
-        PiProcess::DevNode { script } => {
-            let mut c = Command::new("node");
-            c.arg(script);
-            c
-        }
-        PiProcess::SidecarBinary { path } | PiProcess::PathBinary { path } => Command::new(path),
+        PiProcess::ManagedBinary { path, .. }
+        | PiProcess::SidecarBinary { path }
+        | PiProcess::PathBinary { path } => Command::new(path),
     };
 
     cmd.arg("--mode").arg("rpc");
@@ -732,13 +589,6 @@ fn build_command(pi: &PiProcess, options: &RpcStartOptions) -> Command {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-
-    // Merge environment variables
-    if let Some(ref env) = options.env {
-        for (key, value) in env {
-            cmd.env(key, value);
-        }
-    }
 
     // If using a script-based pi binary (e.g. npm global install), ensure its bin dir
     // is on PATH so shebangs like `#!/usr/bin/env node` can resolve node in GUI launches.
@@ -772,14 +622,18 @@ fn write_rpc_line(stdin: &mut std::process::ChildStdin, line: &str) -> Result<()
 }
 
 /// Start the pi coding agent in RPC mode as a child process.
-/// Discovery order: manual pi_path -> dev cli_path -> env override -> sidecar -> PATH/common locations -> error.
+/// Runtime selection comes only from native Desktop settings.
 #[tauri::command]
 async fn rpc_start(
     app: AppHandle,
     state: tauri::State<'_, RpcState>,
+    runtime_state: tauri::State<'_, desktop_runtime::DesktopRuntimeState>,
     options: RpcStartOptions,
     instance_id: Option<String>,
 ) -> Result<RpcStartResult, String> {
+    if runtime_state.is_operation_active() {
+        return Err("Pi runtime maintenance is in progress; retry when it completes".to_string());
+    }
     let instance_id = normalize_instance_id(instance_id);
 
     let generation = if let Ok(mut instances) = state.instances.lock() {
@@ -799,8 +653,8 @@ async fn rpc_start(
         return Err(format!("Working directory does not exist: {}", options.cwd));
     }
 
-    let pi = discover_pi(&app, &options)?;
-    let discovery_label = format!("{:?}", pi);
+    let pi = discover_pi(&app)?;
+    let discovery_label = pi_discovery_label(&pi);
 
     let mut cmd = build_command(&pi, &options);
     let mut child = cmd.spawn().map_err(|e| {
@@ -817,9 +671,44 @@ async fn rpc_start(
         format!("Failed to spawn pi process ({:?}): {}", pi, e)
     })?;
 
-    let stdin = child.stdin.take().ok_or("Failed to get stdin")?;
-    let stdout = child.stdout.take().ok_or("Failed to get stdout")?;
-    let stderr = child.stderr.take().ok_or("Failed to get stderr")?;
+    if runtime_state.is_operation_active() {
+        #[cfg(target_os = "windows")]
+        terminate_windows_process_tree(child.id());
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err("Pi runtime maintenance started during RPC launch; retry later".to_string());
+    }
+
+    let stdin = match child.stdin.take() {
+        Some(stdin) => stdin,
+        None => {
+            #[cfg(target_os = "windows")]
+            terminate_windows_process_tree(child.id());
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("Failed to get Pi RPC stdin".to_string());
+        }
+    };
+    let stdout = match child.stdout.take() {
+        Some(stdout) => stdout,
+        None => {
+            #[cfg(target_os = "windows")]
+            terminate_windows_process_tree(child.id());
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("Failed to get Pi RPC stdout".to_string());
+        }
+    };
+    let stderr = match child.stderr.take() {
+        Some(stderr) => stderr,
+        None => {
+            #[cfg(target_os = "windows")]
+            terminate_windows_process_tree(child.id());
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("Failed to get Pi RPC stderr".to_string());
+        }
+    };
 
     // Store process + stdin handle for this instance
     if let Ok(mut instances) = state.instances.lock() {
@@ -832,13 +721,23 @@ async fn rpc_start(
             },
         );
     } else {
+        #[cfg(target_os = "windows")]
+        terminate_windows_process_tree(child.id());
+        let _ = child.kill();
+        let _ = child.wait();
         return Err("Failed to acquire RPC instances lock".to_string());
     }
+    runtime_state.logger().record(
+        "info",
+        "rpc_started",
+        &format!("{} via {}", instance_id, discovery_label),
+    );
 
     // Spawn thread to read stdout and emit events to frontend
     let app_handle = app.clone();
     let stdout_instance_id = instance_id.clone();
     let stdout_generation = generation;
+    let runtime_logger = runtime_state.logger();
     std::thread::spawn(move || {
         let reader = BufReader::new(stdout);
         for line in reader.lines() {
@@ -860,10 +759,15 @@ async fn rpc_start(
         let _ = app_handle.emit(
             "rpc-closed",
             RpcClosedEventPayload {
-                instance_id: stdout_instance_id,
+                instance_id: stdout_instance_id.clone(),
                 generation: stdout_generation,
                 reason: "process exited".to_string(),
             },
+        );
+        runtime_logger.record(
+            "info",
+            "rpc_exited",
+            &format!("{} generation {}", stdout_instance_id, stdout_generation),
         );
     });
 
@@ -927,12 +831,16 @@ async fn rpc_send(
 #[tauri::command]
 async fn rpc_stop(
     state: tauri::State<'_, RpcState>,
+    runtime_state: tauri::State<'_, desktop_runtime::DesktopRuntimeState>,
     instance_id: Option<String>,
 ) -> Result<(), String> {
     let instance_id = normalize_instance_id(instance_id);
     if let Ok(mut instances) = state.instances.lock() {
         if let Some(mut handle) = instances.remove(&instance_id) {
             stop_rpc_instance(&mut handle);
+            runtime_state
+                .logger()
+                .record("info", "rpc_stopped", &instance_id);
         }
         Ok(())
     } else {
@@ -942,11 +850,17 @@ async fn rpc_stop(
 
 /// Stop all RPC process instances
 #[tauri::command]
-async fn rpc_stop_all(state: tauri::State<'_, RpcState>) -> Result<(), String> {
+async fn rpc_stop_all(
+    state: tauri::State<'_, RpcState>,
+    runtime_state: tauri::State<'_, desktop_runtime::DesktopRuntimeState>,
+) -> Result<(), String> {
     if let Ok(mut instances) = state.instances.lock() {
         for (_, mut handle) in instances.drain() {
             stop_rpc_instance(&mut handle);
         }
+        runtime_state
+            .logger()
+            .record("info", "rpc_stopped_all", "Stopped all Pi RPC processes");
         Ok(())
     } else {
         Err("Failed to acquire RPC instances lock".to_string())
@@ -2370,23 +2284,13 @@ async fn get_pi_oauth_providers(app: AppHandle) -> Result<Vec<PiOAuthProviderInf
         .map(|provider| provider.id.clone())
         .collect();
 
-    let discovery_opts = RpcStartOptions {
-        cli_path: None,
-        pi_path: None,
-        cwd: ".".to_string(),
-        provider: None,
-        model: None,
-        env: None,
-    };
-
-    let Ok(pi) = discover_pi(&app, &discovery_opts) else {
+    let Ok(pi) = discover_pi(&app) else {
         return Ok(providers);
     };
 
     let list_opts = PiCliCommandOptions {
         args: vec!["list".to_string()],
         cwd: Some(".".to_string()),
-        env: None,
     };
 
     let output = match build_plain_command(&pi, &list_opts).output() {
@@ -2435,7 +2339,6 @@ pub struct AppSettings {
     pub follow_up_mode: String,
     pub model_provider: Option<String>,
     pub model_id: Option<String>,
-    pub pi_path: Option<String>,
 }
 
 impl Default for AppSettings {
@@ -2449,7 +2352,6 @@ impl Default for AppSettings {
             follow_up_mode: "one-at-a-time".to_string(),
             model_provider: None,
             model_id: None,
-            pi_path: None,
         }
     }
 }
@@ -2503,7 +2405,6 @@ async fn open_file_dialog(_app: AppHandle, _multiple: bool) -> Result<Vec<String
 struct PiCliCommandOptions {
     args: Vec<String>,
     cwd: Option<String>,
-    env: Option<std::collections::HashMap<String, String>>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -2551,39 +2452,6 @@ struct PiPackageCommandOutput {
     stdout: String,
     stderr: String,
     truncated: bool,
-}
-
-#[derive(Debug, Deserialize)]
-struct CliStatusOptions {
-    cli_path: Option<String>,
-    pi_path: Option<String>,
-    cwd: Option<String>,
-    env: Option<std::collections::HashMap<String, String>>,
-}
-
-#[derive(Debug, Serialize)]
-struct CliUpdateStatus {
-    discovery: String,
-    current_version: Option<String>,
-    latest_version: Option<String>,
-    update_available: bool,
-    can_update_in_app: bool,
-    npm_available: bool,
-    update_command: String,
-    note: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct PiChangelogResult {
-    path: String,
-    content: String,
-}
-
-#[derive(Debug, Serialize)]
-struct NpmCommandResult {
-    stdout: String,
-    stderr: String,
-    exit_code: i32,
 }
 
 const MAX_GIT_DIFF_BYTES: usize = 512 * 1024;
@@ -2642,14 +2510,6 @@ struct DesktopRuntimeInfo {
     platform: String,
     arch: String,
     version: String,
-}
-
-fn npm_executable() -> &'static str {
-    if cfg!(target_os = "windows") {
-        "npm.cmd"
-    } else {
-        "npm"
-    }
 }
 
 fn discover_gh_path() -> Option<PathBuf> {
@@ -2737,149 +2597,11 @@ fn parse_gist_id_from_url(url: &str) -> Option<String> {
     Some(gist_id.to_string())
 }
 
-fn sanitize_version_token(raw: &str) -> String {
-    raw.trim_matches(|c: char| !(c.is_ascii_alphanumeric() || c == '.' || c == '-'))
-        .to_string()
-}
-
-fn is_semverish(token: &str) -> bool {
-    let core = token.split('-').next().unwrap_or(token);
-    let parts: Vec<&str> = core.split('.').collect();
-    if parts.len() < 2 {
-        return false;
-    }
-
-    parts
-        .iter()
-        .take(3)
-        .all(|p| !p.is_empty() && p.chars().all(|c| c.is_ascii_digit()))
-}
-
-fn parse_semver_tuple(version: &str) -> Option<(u64, u64, u64)> {
-    let core = version.split('-').next().unwrap_or(version);
-    let mut parts = core.split('.');
-    let major = parts.next()?.parse::<u64>().ok()?;
-    let minor = parts.next().unwrap_or("0").parse::<u64>().ok()?;
-    let patch = parts.next().unwrap_or("0").parse::<u64>().ok()?;
-    Some((major, minor, patch))
-}
-
-fn is_newer_version(latest: &str, current: &str) -> bool {
-    match (parse_semver_tuple(latest), parse_semver_tuple(current)) {
-        (Some(lat), Some(cur)) => lat > cur,
-        _ => latest.trim() != current.trim(),
-    }
-}
-
-fn extract_version_from_output(output: &str) -> Option<String> {
-    for raw in output.split_whitespace() {
-        let token = sanitize_version_token(raw);
-        if token.is_empty() {
-            continue;
-        }
-
-        let normalized = token.strip_prefix('v').unwrap_or(&token);
-        if is_semverish(normalized) {
-            return Some(normalized.to_string());
-        }
-    }
-
-    None
-}
-
-fn get_current_pi_version(pi: &PiProcess, options: &CliStatusOptions) -> Option<String> {
-    let version_opts = PiCliCommandOptions {
-        args: vec!["--version".to_string()],
-        cwd: options.cwd.clone(),
-        env: options.env.clone(),
-    };
-
-    let output = build_plain_command(pi, &version_opts).output().ok()?;
-    let combined = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    extract_version_from_output(&combined)
-}
-
-fn get_latest_npm_cli_version(pi: Option<&PiProcess>) -> (bool, Option<String>, Option<String>) {
-    let npm_path = match discover_npm_path(pi) {
-        Some(path) => path,
-        None => {
-            return (
-                false,
-                None,
-                Some("npm not found on PATH/common locations".to_string()),
-            );
-        }
-    };
-
-    let mut cmd = Command::new(&npm_path);
-    cmd.arg("view")
-        .arg("@mariozechner/pi-coding-agent")
-        .arg("version")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    if let Some(parent) = npm_path.parent() {
-        prepend_bin_dir_to_path(&mut cmd, parent);
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
-
-    let output = match cmd.output() {
-        Ok(out) => out,
-        Err(err) => {
-            return (true, None, Some(format!("Failed to run npm: {}", err)));
-        }
-    };
-
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-
-    if !output.status.success() {
-        let error = if stderr.is_empty() {
-            "npm returned an error while checking latest version".to_string()
-        } else {
-            stderr
-        };
-        return (true, None, Some(error));
-    }
-
-    let latest = extract_version_from_output(&stdout).or_else(|| {
-        if stdout.is_empty() {
-            None
-        } else {
-            Some(stdout)
-        }
-    });
-
-    if latest.is_none() {
-        return (
-            true,
-            None,
-            Some("Could not parse latest CLI version from npm output".to_string()),
-        );
-    }
-
-    (true, latest, None)
-}
-
 fn build_plain_command(pi: &PiProcess, options: &PiCliCommandOptions) -> Command {
     let mut cmd = match pi {
-        PiProcess::DevNode { script } => {
-            let mut c = Command::new("node");
-            c.arg(script);
-            c
-        }
-        PiProcess::SidecarBinary { path } | PiProcess::PathBinary { path } => Command::new(path),
+        PiProcess::ManagedBinary { path, .. }
+        | PiProcess::SidecarBinary { path }
+        | PiProcess::PathBinary { path } => Command::new(path),
     };
 
     for arg in &options.args {
@@ -2893,12 +2615,6 @@ fn build_plain_command(pi: &PiProcess, options: &PiCliCommandOptions) -> Command
     cmd.stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-
-    if let Some(env) = &options.env {
-        for (key, value) in env {
-            cmd.env(key, value);
-        }
-    }
 
     if let PiProcess::PathBinary { path } = pi {
         if let Some(parent) = path.parent() {
@@ -3170,19 +2886,10 @@ async fn execute_pi_package_command(
 ) -> Result<PiPackageCommandOutput, String> {
     let _operation = state.operation.lock().await;
     let cwd = external_command_path(root).to_string_lossy().to_string();
-    let discovery_options = RpcStartOptions {
-        cli_path: None,
-        pi_path: None,
-        cwd: cwd.clone(),
-        provider: None,
-        model: None,
-        env: None,
-    };
-    let pi = discover_pi(app, &discovery_options)?;
+    let pi = discover_pi(app)?;
     let options = PiCliCommandOptions {
         args,
         cwd: Some(cwd),
-        env: None,
     };
     let command = build_plain_command(&pi, &options);
     let active_child = Arc::clone(&state.active_child);
@@ -3407,154 +3114,6 @@ async fn list_pi_themes(workspace_root: String) -> Result<Vec<PiThemeInfo>, Stri
             .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
     });
     Ok(themes)
-}
-
-/// Get current vs latest CLI version and whether in-app update is available.
-#[tauri::command]
-async fn get_cli_update_status(
-    app: AppHandle,
-    options: Option<CliStatusOptions>,
-) -> Result<CliUpdateStatus, String> {
-    let opts = options.unwrap_or(CliStatusOptions {
-        cli_path: None,
-        pi_path: None,
-        cwd: Some(".".to_string()),
-        env: None,
-    });
-
-    let discovery_opts = RpcStartOptions {
-        cli_path: opts.cli_path.clone(),
-        pi_path: opts.pi_path.clone(),
-        cwd: opts.cwd.clone().unwrap_or_else(|| ".".to_string()),
-        provider: None,
-        model: None,
-        env: opts.env.clone(),
-    };
-
-    let pi = discover_pi(&app, &discovery_opts)?;
-    let discovery = format!("{:?}", pi);
-    let current_version = get_current_pi_version(&pi, &opts);
-
-    let (npm_available, latest_version, npm_note) = get_latest_npm_cli_version(Some(&pi));
-
-    let can_update_in_app = matches!(pi, PiProcess::PathBinary { .. });
-    let update_command = "npm install -g @mariozechner/pi-coding-agent@latest".to_string();
-
-    let update_available = match (&current_version, &latest_version) {
-        (Some(current), Some(latest)) if can_update_in_app => is_newer_version(latest, current),
-        _ => false,
-    };
-
-    let note = if let Some(note) = npm_note {
-        Some(note)
-    } else if matches!(pi, PiProcess::SidecarBinary { .. }) {
-        Some(
-            "Using bundled sidecar binary; update the desktop app bundle to update CLI".to_string(),
-        )
-    } else if matches!(pi, PiProcess::DevNode { .. }) {
-        Some("Using a dev CLI path; update your local coding-agent checkout".to_string())
-    } else if !can_update_in_app {
-        Some("Current CLI source is not updatable from inside desktop".to_string())
-    } else {
-        None
-    };
-
-    Ok(CliUpdateStatus {
-        discovery,
-        current_version,
-        latest_version,
-        update_available,
-        can_update_in_app,
-        npm_available,
-        update_command,
-        note,
-    })
-}
-
-#[tauri::command]
-async fn get_pi_changelog(
-    app: AppHandle,
-    options: Option<CliStatusOptions>,
-) -> Result<PiChangelogResult, String> {
-    let opts = options.unwrap_or(CliStatusOptions {
-        cli_path: None,
-        pi_path: None,
-        cwd: Some(".".to_string()),
-        env: None,
-    });
-
-    let discovery_opts = RpcStartOptions {
-        cli_path: opts.cli_path.clone(),
-        pi_path: opts.pi_path.clone(),
-        cwd: opts.cwd.clone().unwrap_or_else(|| ".".to_string()),
-        provider: None,
-        model: None,
-        env: opts.env.clone(),
-    };
-
-    let pi = discover_pi(&app, &discovery_opts)?;
-    let candidates = resolve_pi_changelog_candidates(&pi);
-    let mut seen = HashSet::new();
-
-    for candidate in candidates {
-        let raw = candidate.to_string_lossy().to_string();
-        if raw.trim().is_empty() || !seen.insert(raw.clone()) {
-            continue;
-        }
-        if !candidate.is_file() {
-            continue;
-        }
-
-        match fs::read_to_string(&candidate) {
-            Ok(content) => {
-                return Ok(PiChangelogResult { path: raw, content });
-            }
-            Err(_) => {
-                continue;
-            }
-        }
-    }
-
-    Err(format!(
-        "Could not locate Pi Coding Agent changelog for discovery: {:?}",
-        pi
-    ))
-}
-
-/// Update globally installed pi CLI via npm.
-#[tauri::command]
-async fn update_cli_via_npm() -> Result<NpmCommandResult, String> {
-    let npm_path = discover_npm_path(None).ok_or_else(|| {
-        "npm was not found on PATH/common locations. Install Node.js/npm first.".to_string()
-    })?;
-
-    let mut cmd = Command::new(&npm_path);
-    cmd.arg("install")
-        .arg("-g")
-        .arg("@mariozechner/pi-coding-agent@latest")
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    if let Some(parent) = npm_path.parent() {
-        prepend_bin_dir_to_path(&mut cmd, parent);
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-    }
-
-    let output = cmd
-        .output()
-        .map_err(|e| format!("Failed to run npm update command: {}", e))?;
-
-    Ok(NpmCommandResult {
-        stdout: String::from_utf8_lossy(&output.stdout).to_string(),
-        stderr: String::from_utf8_lossy(&output.stderr).to_string(),
-        exit_code: output.status.code().unwrap_or(-1),
-    })
 }
 
 fn git_output<I, S>(root: &Path, args: I) -> Result<std::process::Output, String>
@@ -4143,6 +3702,235 @@ async fn get_desktop_runtime_info(app: AppHandle) -> Result<DesktopRuntimeInfo, 
 }
 
 #[tauri::command]
+async fn get_pi_runtime_status(
+    app: AppHandle,
+    rpc_state: tauri::State<'_, RpcState>,
+    runtime_state: tauri::State<'_, desktop_runtime::DesktopRuntimeState>,
+    check_updates: bool,
+) -> Result<desktop_runtime::PiRuntimeStatus, String> {
+    let settings = desktop_runtime::load_settings(&app)?;
+    let active_rpc_count = active_rpc_count(&rpc_state)?;
+    let installed_versions = desktop_runtime::list_installed_runtimes(&app)?;
+    let operation_active = runtime_state.is_operation_active();
+
+    let (effective_source, managed, fallback, executable, known_version, mut note) =
+        match discover_pi(&app) {
+            Ok(PiProcess::ManagedBinary { path, version }) => (
+                "managed".to_string(),
+                true,
+                false,
+                Some(path),
+                Some(version),
+                None,
+            ),
+            Ok(PiProcess::SidecarBinary { path }) => (
+                "bundled".to_string(),
+                true,
+                false,
+                Some(path),
+                None,
+                Some("The bundled Pi runtime is updated with Pi Desktop.".to_string()),
+            ),
+            Ok(PiProcess::PathBinary { path }) => {
+                let fallback = settings.mode == desktop_runtime::RuntimeMode::Managed;
+                (
+                    "system".to_string(),
+                    false,
+                    fallback,
+                    Some(path),
+                    None,
+                    fallback.then(|| {
+                        "Managed Pi is not installed; using the existing system Pi fallback."
+                            .to_string()
+                    }),
+                )
+            }
+            Err(error) => (
+                "unavailable".to_string(),
+                false,
+                false,
+                None,
+                None,
+                Some(error),
+            ),
+        };
+
+    let current_version = if let Some(version) = known_version {
+        Some(version)
+    } else if let Some(path) = executable.clone() {
+        match tokio::task::spawn_blocking(move || desktop_runtime::version_at_path(&path)).await {
+            Ok(Ok(version)) => Some(version),
+            Ok(Err(error)) => {
+                note = Some(error);
+                None
+            }
+            Err(error) => {
+                note = Some(format!("Pi version check task failed: {error}"));
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    let release = if check_updates {
+        Some(
+            tokio::task::spawn_blocking(desktop_runtime::fetch_latest_release)
+                .await
+                .map_err(|error| format!("Pi release check task failed: {error}"))??,
+        )
+    } else {
+        None
+    };
+    let latest_version = release.as_ref().map(|release| release.version.clone());
+    let update_available = match (&latest_version, &current_version) {
+        (Some(latest), Some(current)) => desktop_runtime::is_newer_release(latest, current),
+        (Some(_), None) => true,
+        _ => false,
+    };
+
+    Ok(desktop_runtime::PiRuntimeStatus {
+        mode: settings.mode,
+        effective_source,
+        managed,
+        fallback,
+        current_version,
+        latest_version,
+        update_available,
+        executable: executable.map(|path| path.to_string_lossy().to_string()),
+        system_pi_path: settings.system_pi_path,
+        installed_versions,
+        operation_active,
+        active_rpc_count,
+        note,
+        release_notes: release
+            .as_ref()
+            .map(|release| release.release_notes.clone()),
+        release_url: release.as_ref().map(|release| release.release_url.clone()),
+        published_at: release.and_then(|release| release.published_at),
+    })
+}
+
+#[tauri::command]
+async fn set_pi_runtime_settings(
+    app: AppHandle,
+    rpc_state: tauri::State<'_, RpcState>,
+    runtime_state: tauri::State<'_, desktop_runtime::DesktopRuntimeState>,
+    mode: desktop_runtime::RuntimeMode,
+    system_pi_path: Option<String>,
+) -> Result<desktop_runtime::RuntimeSettings, String> {
+    let _operation = runtime_state.begin_operation()?;
+    if active_rpc_count(&rpc_state)? > 0 {
+        return Err("Disconnect all Pi sessions before changing the runtime source".to_string());
+    }
+
+    if mode == desktop_runtime::RuntimeMode::System {
+        if let Some(raw) = system_pi_path
+            .as_deref()
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+        {
+            let path = resolve_explicit_pi_path(raw)
+                .ok_or_else(|| format!("Configured system Pi path was not found: {raw}"))?;
+            let verified_path = path.clone();
+            tokio::task::spawn_blocking(move || desktop_runtime::version_at_path(&verified_path))
+                .await
+                .map_err(|error| format!("System Pi validation task failed: {error}"))??;
+        }
+    }
+
+    let settings = desktop_runtime::save_settings(&app, mode, system_pi_path)?;
+    runtime_state.logger().record(
+        "info",
+        "runtime_settings_changed",
+        &format!("Runtime mode set to {:?}", settings.mode),
+    );
+    Ok(settings)
+}
+
+#[tauri::command]
+async fn install_managed_pi_runtime(
+    app: AppHandle,
+    rpc_state: tauri::State<'_, RpcState>,
+    runtime_state: tauri::State<'_, desktop_runtime::DesktopRuntimeState>,
+) -> Result<desktop_runtime::ManagedInstallResult, String> {
+    let _operation = runtime_state.begin_operation()?;
+    if active_rpc_count(&rpc_state)? > 0 {
+        return Err("Disconnect all Pi sessions before installing or updating Pi".to_string());
+    }
+    let app_for_install = app.clone();
+    let logger = runtime_state.logger();
+    let logger_for_error = logger.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        desktop_runtime::install_latest_runtime(&app_for_install, &logger)
+    })
+    .await
+    .map_err(|error| format!("Managed Pi installation task failed: {error}"))?;
+    let result = match result {
+        Ok(result) => result,
+        Err(error) => {
+            logger_for_error.record("error", "runtime_install_failed", &error);
+            return Err(error);
+        }
+    };
+    let prior_settings = desktop_runtime::load_settings(&app)?;
+    desktop_runtime::save_settings(
+        &app,
+        desktop_runtime::RuntimeMode::Managed,
+        prior_settings.system_pi_path,
+    )?;
+    Ok(result)
+}
+
+#[tauri::command]
+async fn activate_managed_pi_runtime(
+    app: AppHandle,
+    rpc_state: tauri::State<'_, RpcState>,
+    runtime_state: tauri::State<'_, desktop_runtime::DesktopRuntimeState>,
+    version: String,
+) -> Result<desktop_runtime::ManagedInstallResult, String> {
+    let _operation = runtime_state.begin_operation()?;
+    if active_rpc_count(&rpc_state)? > 0 {
+        return Err("Disconnect all Pi sessions before rolling back Pi".to_string());
+    }
+    let app_for_activation = app.clone();
+    let logger = runtime_state.logger();
+    let result = tokio::task::spawn_blocking(move || {
+        desktop_runtime::activate_installed_runtime(&app_for_activation, version.trim(), &logger)
+    })
+    .await
+    .map_err(|error| format!("Managed Pi rollback task failed: {error}"))??;
+    let prior_settings = desktop_runtime::load_settings(&app)?;
+    desktop_runtime::save_settings(
+        &app,
+        desktop_runtime::RuntimeMode::Managed,
+        prior_settings.system_pi_path,
+    )?;
+    Ok(result)
+}
+
+#[tauri::command]
+async fn get_pi_runtime_diagnostics(
+    app: AppHandle,
+    rpc_state: tauri::State<'_, RpcState>,
+    terminal_state: tauri::State<'_, TerminalState>,
+    runtime_state: tauri::State<'_, desktop_runtime::DesktopRuntimeState>,
+) -> Result<desktop_runtime::RuntimeDiagnostics, String> {
+    let active_rpc_count = active_rpc_count(&rpc_state)?;
+    let active_terminal_count = terminal_state
+        .instances
+        .lock()
+        .map_err(|_| "Failed to acquire terminal instances lock".to_string())?
+        .len();
+    desktop_runtime::diagnostics(
+        &app,
+        &runtime_state,
+        active_rpc_count,
+        active_terminal_count,
+    )
+}
+
+#[tauri::command]
 async fn open_path_in_default_app(path: String) -> Result<(), String> {
     let trimmed = path.trim();
     if trimmed.is_empty() {
@@ -4251,7 +4039,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .manage(desktop_runtime::DesktopRuntimeState::default())
         .setup(|app| {
+            let runtime_state = app.state::<desktop_runtime::DesktopRuntimeState>();
+            runtime_state.initialize(app.handle());
             #[cfg(target_os = "macos")]
             {
                 if let Some(window) = app.get_webview_window("main") {
@@ -4294,9 +4085,6 @@ pub fn run() {
             remove_pi_package,
             update_pi_packages,
             list_pi_themes,
-            get_cli_update_status,
-            get_pi_changelog,
-            update_cli_via_npm,
             get_git_workspace_status,
             get_git_diff,
             list_git_worktrees,
@@ -4304,6 +4092,11 @@ pub fn run() {
             remove_git_worktree,
             create_share_gist,
             get_desktop_runtime_info,
+            get_pi_runtime_status,
+            set_pi_runtime_settings,
+            install_managed_pi_runtime,
+            activate_managed_pi_runtime,
+            get_pi_runtime_diagnostics,
             open_path_in_default_app,
         ])
         .build(tauri::generate_context!())
@@ -4328,6 +4121,8 @@ pub fn run() {
             };
             let package_state = app_handle.state::<PiPackageState>();
             stop_pi_package_child(&package_state.active_child);
+            let runtime_state = app_handle.state::<desktop_runtime::DesktopRuntimeState>();
+            runtime_state.record_shutdown();
         }
     });
 }

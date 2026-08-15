@@ -24,7 +24,8 @@
 		"gate:pi-real": "node --experimental-strip-types scripts/real-pi-rpc-gate.mjs",
 		"gate:sessions-real": "node scripts/real-pi-session-gate.mjs",
 		"gate:models-real": "node scripts/real-pi-model-gate.mjs",
-		"gate:ecosystem-real": "node scripts/real-pi-ecosystem-gate.mjs"
+		"gate:ecosystem-real": "node scripts/real-pi-ecosystem-gate.mjs",
+		"gate:runtime-real": "cargo test --locked --manifest-path src-tauri/Cargo.toml desktop_runtime::tests::installs_and_reuses_an_official_runtime_in_isolation -- --ignored --exact --nocapture"
 	},
 	"dependencies": {
 		"@tauri-apps/api": "^2.0.0",

@@ -23,7 +23,6 @@ export type PiStartOptions = Readonly<{
 	cwd: string;
 	provider?: string;
 	model?: string;
-	piPath?: string;
 }>;
 
 export type PiAdapterEvent =
@@ -134,12 +133,9 @@ export class PiAdapter {
 		try {
 			const result = await invoke<RpcStartResult>("rpc_start", {
 				options: {
-					cli_path: null,
-					pi_path: options.piPath?.trim() || null,
 					cwd: options.cwd,
 					provider: options.provider?.trim() || null,
 					model: options.model?.trim() || null,
-					env: null,
 				},
 				instanceId: this.instanceId,
 			});
