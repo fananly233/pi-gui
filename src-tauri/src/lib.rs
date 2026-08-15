@@ -2682,6 +2682,24 @@ mod tests {
     }
 
     #[test]
+    fn non_object_auth_is_rejected_without_overwriting_the_file() {
+        let root = test_root();
+        fs::create_dir_all(&root).expect("create auth test directory");
+        let auth_file = root.join("auth.json");
+        let non_object = "[]\n";
+        fs::write(&auth_file, non_object).expect("write non-object auth file");
+
+        let error = clear_provider_auth_file(&auth_file, "deepseek")
+            .expect_err("non-object auth must be rejected");
+        assert!(error.contains("must contain a JSON object"));
+        assert_eq!(
+            fs::read_to_string(&auth_file).expect("read preserved auth file"),
+            non_object
+        );
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
     fn rejects_unsupported_provider_characters() {
         assert_eq!(
             normalize_auth_provider(" OpenAI-Codex ").expect("valid provider"),
