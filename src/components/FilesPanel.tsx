@@ -9,22 +9,29 @@ type FilesPanelProps = {
 	onMentionFile: (path: string) => void;
 	canMention: boolean;
 	onClose: () => void;
+	onDirtyStateChange: (dirty: boolean) => void;
 };
 
-export function FilesPanel({ workspaceRoot, selectedPath, onSelectPath, onMentionFile, canMention, onClose }: FilesPanelProps) {
+export function FilesPanel({ workspaceRoot, selectedPath, onSelectPath, onMentionFile, canMention, onClose, onDirtyStateChange }: FilesPanelProps) {
 	const [dirty, setDirty] = useState(false);
 
 	useEffect(() => {
 		setDirty(false);
+		onDirtyStateChange(false);
 	}, [selectedPath, workspaceRoot]);
 
-	const onDirtyChange = useCallback((value: boolean) => setDirty(value), []);
+	useEffect(() => () => onDirtyStateChange(false), [onDirtyStateChange]);
+
+	const onDirtyChange = useCallback((value: boolean) => {
+		setDirty(value);
+		onDirtyStateChange(value);
+	}, [onDirtyStateChange]);
 	const close = () => {
 		if (!dirty || window.confirm("Discard unsaved file changes and close the Files panel?")) onClose();
 	};
 
 	return (
-		<aside className="files-panel" aria-label="Project files">
+		<aside className="workspace-tool-panel files-panel" aria-label="Project files">
 			<button type="button" className="files-panel__close" onClick={close} title="Close files panel">×</button>
 			{!workspaceRoot ? (
 				<div className="file-surface__empty">

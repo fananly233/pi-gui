@@ -21,6 +21,14 @@ The renderer never receives a general-purpose filesystem API. Phase 5 project ac
 
 Each command is scoped to a canonical workspace root and relative path. The file index exists only for `@file` completion; image attachments use Pi RPC's native `images` payload and are not written to disk by the desktop app.
 
+## Terminal capability contract
+
+Phase 6 provides one renderer-owned xterm surface backed by a real native PTY. The renderer can start, write, resize, and stop only the terminal ID returned by Rust. Shell discovery, process ownership, byte-stream events, and process-tree cleanup remain native responsibilities. No arbitrary WebView shell capability is granted.
+
+## Git/worktree capability contract
+
+Git is intentionally not an IDE command console. Typed Rust commands provide status, staged/unstaged diff, worktree list, guarded create, and safe remove. There is no renderer API for arbitrary arguments, stage, commit, fetch, push, reset, force removal, or choosing an unrestricted destination. Switching to a listed worktree disconnects the active Pi session before changing the selected workspace.
+
 ---
 
 ## Extension UI capability contract

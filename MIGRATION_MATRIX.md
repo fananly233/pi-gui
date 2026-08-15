@@ -96,6 +96,24 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Read-only MCO Scout | PASS WITH MANUAL VERIFICATION | One scoped `pi:deepseek/deepseek-v4-flash` Scout reviewed only the Phase 5 file paths. Its containment and permission recommendations were checked against the implementation and Rust tests. |
 | Static architecture scan | PASS | No Electron dependency or host directory, `window.piBridge`, Browser Agent, Channels, terminal/git UI, general WebView fs permission, or direct fs plugin dependency was introduced. |
 
+## Phase 6 verification (2026-08-14, Windows)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| `npm test` | PASS | Seventeen deterministic renderer tests from Phases 2–5 remain green. No mock terminal or Git transport was added. |
+| `npm run check` | PASS | xterm lifecycle wiring, typed Git/worktree API, panel switching, and Files dirty-state protection pass strict TypeScript. |
+| `npm run build:frontend` | PASS | 316 modules. The main bundle is 452.39 kB and the lazy terminal chunk is 333.94 kB before gzip; no large-chunk warning remains. |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | PASS WITH EXISTING WARNING | The inherited Windows-only unused `app` setup parameter remains; no new Rust warning was introduced. |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | PASS | Fourteen Rust tests include a real native Windows ConPTY round trip plus a temporary real Git repository covering status, diff, worktree creation, main/dirty refusal, and clean removal. |
+| `npm audit --omit=dev` | PASS | Zero production vulnerabilities. The six inherited development-tool advisories remain outside the production tree. |
+| Real Windows Git UI | PASS | `npm run tauri dev` rendered the current branch, 12 real working-tree changes, main/current/dirty worktree guards, and an actual Rust diff while Pi was disconnected. The workspace picker stayed locked while the tool panel was open. |
+| Terminal runtime | PASS WITH UI AUTOMATION LIMIT | The native test opened a real ConPTY, answered PowerShell's cursor-position probe, exchanged a marker, and exited cleanly. The xterm renderer compiles and lazy-loads; command entry was not driven by Windows UI automation because the automation safety policy prohibits controlling terminal applications. |
+| Capability closure | PASS | Renderer shell execute/spawn/stdin/kill grants were removed. Terminal and Git are available only through typed Rust commands; external-link open remains allow-listed. |
+| Worktree safety | PASS | The API validates branch names, chooses an adjacent destination, refuses arbitrary Git arguments and force removal, and rejects main/current/dirty/locked/prunable/missing worktrees. Real create/remove behavior ran only in an isolated temporary repository. |
+| Windows process lifecycle | PASS | Closing the real Tauri window ended the development process tree; no workspace-owned `pi-desktop`, Cargo, or Vite process remained. |
+| Read-only MCO Scout | PASS WITH FIXES | One scoped `pi:deepseek/deepseek-v4-flash` Scout identified the inherited arbitrary Git command and broad renderer shell permissions. Both were replaced/removed before verification. |
+| Static architecture scan | PASS | No Electron host directory, `window.piBridge`, Browser Agent, Channels, arbitrary Git command, or renderer shell process capability was introduced. |
+
 ## Migration decisions
 
 | Feature | DLYZZT source | Gustav source | Strategy | Priority | Risk | Verification |
@@ -110,10 +128,10 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Sessions and history | Session contracts and presentation ideas | Rust session commands and Lit session browser | ADAPT | P0 | Medium | Phase 3 deterministic race tests, real session RPC gate, isolated Windows UI flows, and process-cleanup check. |
 | Models, providers, and authentication | React presentation ideas | Rust auth/provider discovery plus Pi model RPC | ADAPT | P1 | Medium | Phase 4 safe catalog tests, isolated auth-file tests, real model/thinking gate, restart/session isolation, and Windows UI checks. |
 | File browsing, editing, `@file`, and image attachments | React file UI ideas | Rust path helpers, native dialog, file-viewer semantics, and Pi image RPC | ADAPT | P1 | Medium | Phase 5 deterministic mention tests, Rust containment/save tests, and real Windows preview/attachment UI checks. |
-| Terminal, git, and worktrees | React presentation ideas | Shell capability allow-list and Rust git commands | ADAPT | P1 | High | Phase 6 shell lifecycle, git status, and worktree safety tests. |
+| Terminal, git, and worktrees | React presentation ideas | Native process/Git foundations | ADAPT | P1 | High | Real ConPTY test, typed Git status/diff, guarded worktree test, real Windows Git UI, and capability scan. |
 | Pi packages, extensions, skills, and prompts | Exclude Electron host implementations | Existing CLI/package commands and extension UI | ADAPT | P1 | Medium | Phase 7 real list/install/remove/update flows. |
 | Managed Pi runtime and release packaging | Bundled-tool concepts only | Existing Tauri sidecar discovery | DEFER | P2 | High | Phase 8 clean-machine install and upgrade gate. |
 | Electron main, preload, and agent host | `src/main`, `src/preload`, `src/agent-host` | None | DROP | P0 | Low | Static scan contains no Electron dependency or host bootstrap. |
 | Browser Agent and Channels | Browser and Channels trees | None | DROP | P0 | Low | Static scan contains no Browser Agent or Channels source. |
 
-Phase 5 adds a workspace-scoped native file explorer, bounded UTF-8 preview/editor, conflict-aware save, local `@file` completion/insertion, and image picker/paste/drop previews that map directly to Pi RPC image payloads. It does not expose a general filesystem bridge, create/delete files, import DLYZZT's Electron host, or claim an image-provider round trip that was not run. Terminal/git, package management, managed runtime, Browser Agent, Channels, and mock Pi behavior remain absent.
+Phase 6 adds a lazy xterm surface backed by a managed native PTY, typed Git status and bounded diffs, and guarded worktree list/create/use/remove flows. It removes the inherited arbitrary Git command and broad renderer shell process capabilities. It does not add stage/commit/fetch/push/reset, force worktree deletion, an unrestricted destination picker, a complete IDE, package management, a managed runtime, Browser Agent, Channels, or mock Pi behavior.

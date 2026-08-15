@@ -3,6 +3,7 @@ import type { PiChatController } from "../hooks/usePiChat";
 import { ChatInput } from "./ChatInput";
 import { MessageView } from "./MessageView";
 import { ModelsAuthPanel } from "./ModelsAuthPanel";
+import type { WorkspaceTool } from "./AppShell";
 
 type ChatWindowProps = Pick<
 	PiChatController,
@@ -34,8 +35,8 @@ type ChatWindowProps = Pick<
 > & {
 	workspaceRoot: string | null;
 	fileMentionSeed: { id: number; path: string } | null;
-	filesOpen: boolean;
-	onToggleFiles: () => void;
+	activeTool: WorkspaceTool | null;
+	onToggleTool: (tool: WorkspaceTool) => void;
 };
 
 function baseName(path: string | null): string | null {
@@ -80,9 +81,17 @@ export function ChatWindow(props: ChatWindowProps) {
 					<h2 title={props.activeSessionPath ?? undefined}>{sessionLabel}</h2>
 				</div>
 				<div className="chat-header__actions">
-					<button type="button" className={`files-trigger${props.filesOpen ? " is-active" : ""}`} onClick={props.onToggleFiles} data-testid="files-button">
+					<button type="button" className={`workspace-tool-trigger${props.activeTool === "files" ? " is-active" : ""}`} onClick={() => props.onToggleTool("files")} data-testid="files-button">
 						<span aria-hidden="true">▤</span>
 						Files
+					</button>
+					<button type="button" className={`workspace-tool-trigger${props.activeTool === "git" ? " is-active" : ""}`} onClick={() => props.onToggleTool("git")} data-testid="git-button">
+						<span aria-hidden="true">⑂</span>
+						Git
+					</button>
+					<button type="button" className={`workspace-tool-trigger${props.activeTool === "terminal" ? " is-active" : ""}`} onClick={() => props.onToggleTool("terminal")} data-testid="terminal-button">
+						<span aria-hidden="true">›_</span>
+						Terminal
 					</button>
 					<button type="button" className="model-trigger" data-testid="models-auth-button" onClick={() => setModelsOpen(true)}>
 						<span>Model</span>

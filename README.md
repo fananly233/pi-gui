@@ -25,7 +25,7 @@ Exact source revisions, licenses, and modification boundaries are recorded in [T
 
 ## Current migration status
 
-The active React renderer currently implements **Phase 4: Models / Auth**. It includes the Phase 2 real Pi chat path, Phase 3 isolated session workflows, and real Pi RPC model search/switching plus model-supported thinking levels. The provider panel reads metadata only, supports explicit removal of credentials stored by Pi, and directs interactive OAuth login to Pi TUI's `/login` because Pi RPC 0.84.2 does not expose that flow. Files, terminal/git, packages, and managed runtime remain later migration phases. Feature inventories below describe the Gustav upstream baseline and migration targets; they are not all exposed by the current React UI yet.
+The active React renderer currently implements **Phase 6: Terminal / Git / Worktree**. It includes the real Pi chat path, isolated sessions, model/auth workflows, workspace-scoped files and attachments, a managed native PTY with xterm, typed Git status/diffs, and guarded worktree workflows. Package management and the managed runtime remain later migration phases. Feature inventories below describe the Gustav upstream baseline and migration targets; they are not all exposed by the current React UI yet.
 
 <img width="1227" height="869" alt="Screenshot 2026-03-28 at 23 28 39" src="https://github.com/user-attachments/assets/0c15a79f-870c-44a0-9489-4b0d2d577e76" />
 
@@ -208,13 +208,14 @@ npm run build:frontend
 npm run tauri build
 ```
 
-### Phase 2–4 verification
+### Phase 2–6 verification
 
 ```bash
 npm test
 npm run gate:pi-real
 npm run gate:sessions-real
 npm run gate:models-real
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
 `gate:pi-real` starts the installed Pi CLI in real RPC mode with `--no-session`. It defaults to `deepseek/deepseek-v4-flash` and can be redirected with `PI_GUI_GATE_PROVIDER`, `PI_GUI_GATE_MODEL`, and `PI_GUI_GATE_CWD`.
@@ -260,7 +261,7 @@ Pi Desktop treats packages as first-class building blocks:
 
 See: **[`docs/PERMISSIONS.md`](./docs/PERMISSIONS.md)**
 
-Tauri capabilities currently include filesystem and shell permissions needed to run Pi and manage project resources. Review before deploying in restricted environments.
+The WebView has no general filesystem or shell-execution capability. Files, terminal lifecycle, Git status/diffs, and guarded worktree operations are exposed through narrow Rust commands. Review the documented boundaries before deploying in restricted environments.
 
 ---
 

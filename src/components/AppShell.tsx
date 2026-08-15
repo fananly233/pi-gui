@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { DesktopRuntimeInfo } from "../api/desktop-api";
 import type { PiChatController } from "../hooks/usePiChat";
 import { applyTheme, readStoredTheme, storeTheme, type Theme } from "../theme";
 import { ChatWindow } from "./ChatWindow";
 import { FilesPanel } from "./FilesPanel";
+import { GitPanel } from "./GitPanel";
 import { SessionSidebar } from "./SessionSidebar";
 import { TitleBar } from "./TitleBar";
+
+const TerminalPanel = lazy(async () => ({ default: (await import("./TerminalPanel")).TerminalPanel }));
 
 export type RuntimeState =
 	| { status: "loading" }
@@ -22,6 +25,8 @@ type AppShellProps = {
 	chat: PiChatController;
 };
 
+export type WorkspaceTool = "files" | "git" | "terminal";
+
 function RuntimePanel({ state, onRetry }: { state: RuntimeState; onRetry: () => Promise<void> }) {
 	if (state.status === "loading") return <span>Checking Rust bridge…</span>;
 	if (state.status === "error") {
@@ -37,13 +42,14 @@ function RuntimePanel({ state, onRetry }: { state: RuntimeState; onRetry: () => 
 
 export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorkspacePathChange, onChooseWorkspace, onConnect, chat }: AppShellProps) {
 	const [theme, setTheme] = useState<Theme>(() => readStoredTheme());
-	const [filesOpen, setFilesOpen] = useState(false);
+	const [activeTool, setActiveTool] = useState<WorkspaceTool | null>(null);
+	const [filesDirty, setFilesDirty] = useState(false);
 	const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
 	const [fileMentionSeed, setFileMentionSeed] = useState<{ id: number; path: string } | null>(null);
 	const fileMentionSequence = useRef(0);
 	const connectionBusy = chat.connection.status === "connecting";
 	const connected = chat.connection.status === "connected";
-	const workspaceRoot = connected ? workspacePath.trim() || null : null;
+	const workspaceRoot = workspacePath.trim() || null;
 	const connectionTone = chat.sessionReady ? (chat.activity === "idle" ? "ready" : "loading") : connected ? "ready" : connectionBusy ? "loading" : chat.connection.status === "error" ? "error" : "muted";
 
 	const toggleTheme = () => {
@@ -55,7 +61,24 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 
 	useEffect(() => {
 		setSelectedFilePath(null);
+		setFilesDirty(false);
 	}, [workspacePath]);
+
+	const onFilesDirtyChange = useCallback((dirty: boolean) => setFilesDirty(dirty), []);
+
+	const toggleTool = (tool: WorkspaceTool) => {
+		const nextTool = activeTool === tool ? null : tool;
+		if (activeTool === "files" && filesDirty && nextTool !== "files"
+			&& !window.confirm("Discard unsaved file changes and leave the Files panel?")) return;
+		setActiveTool(nextTool);
+	};
+
+	const useWorktree = async (path: string) => {
+		if (connected && !window.confirm("Disconnect the active Pi session and use this worktree as the workspace?")) return;
+		if (connected) await chat.disconnect();
+		onWorkspacePathChange(path);
+		setActiveTool(null);
+	};
 
 	const mentionFile = (path: string) => {
 		setFileMentionSeed({ id: ++fileMentionSequence.current, path });
@@ -89,10 +112,10 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 								type="text"
 								value={workspacePath}
 								onChange={(event) => onWorkspacePathChange(event.target.value)}
-								disabled={connectionBusy || connected}
+								disabled={connectionBusy || connected || activeTool !== null}
 								spellCheck={false}
 							/>
-							<button type="button" className="icon-button workspace-picker__button" onClick={() => void onChooseWorkspace()} disabled={connectionBusy || connected} title="Choose workspace folder">…</button>
+							<button type="button" className="icon-button workspace-picker__button" onClick={() => void onChooseWorkspace()} disabled={connectionBusy || connected || activeTool !== null} title="Choose workspace folder">…</button>
 						</div>
 
 						{connected ? (
@@ -125,7 +148,7 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 					</div>
 				</aside>
 
-				<main className={`workspace workspace--chat${filesOpen ? " workspace--files-open" : ""}`}>
+				<main className={`workspace workspace--chat${activeTool ? " workspace--tool-open" : ""}`}>
 					<ChatWindow
 						connection={chat.connection}
 						activity={chat.activity}
@@ -154,18 +177,27 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 						clearError={chat.clearError}
 						workspaceRoot={workspaceRoot}
 						fileMentionSeed={fileMentionSeed}
-						filesOpen={filesOpen}
-						onToggleFiles={() => setFilesOpen((value) => !value)}
+						activeTool={activeTool}
+						onToggleTool={toggleTool}
 					/>
-					{filesOpen ? (
+					{activeTool === "files" ? (
 						<FilesPanel
 							workspaceRoot={workspaceRoot}
 							selectedPath={selectedFilePath}
 							onSelectPath={setSelectedFilePath}
 							onMentionFile={mentionFile}
 							canMention={chat.sessionReady}
-							onClose={() => setFilesOpen(false)}
+							onClose={() => setActiveTool(null)}
+							onDirtyStateChange={onFilesDirtyChange}
 						/>
+					) : null}
+					{activeTool === "git" ? (
+						<GitPanel workspaceRoot={workspaceRoot} onClose={() => setActiveTool(null)} onUseWorkspace={useWorktree} />
+					) : null}
+					{activeTool === "terminal" ? (
+						<Suspense fallback={<aside className="workspace-tool-panel terminal-panel"><div className="tool-panel__empty">Loading terminal…</div></aside>}>
+							<TerminalPanel workspaceRoot={workspaceRoot} theme={theme} onClose={() => setActiveTool(null)} />
+						</Suspense>
 					) : null}
 				</main>
 			</div>
