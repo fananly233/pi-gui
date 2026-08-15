@@ -12,6 +12,12 @@ import type { JsonObject } from "./event-normalizer";
 
 export type StreamingBehavior = "steer" | "followUp";
 
+export type PiImageInput = Readonly<{
+	type: "image";
+	data: string;
+	mimeType: string;
+}>;
+
 export type PiStartOptions = Readonly<{
 	cwd: string;
 	provider?: string;
@@ -160,16 +166,16 @@ export class PiAdapter {
 		this.currentGeneration = null;
 	}
 
-	prompt(message: string): Promise<void> {
-		return this.request({ type: "prompt", message });
+	prompt(message: string, images: readonly PiImageInput[] = []): Promise<void> {
+		return this.request({ type: "prompt", message, ...(images.length ? { images } : {}) });
 	}
 
-	steer(message: string): Promise<void> {
-		return this.request({ type: "steer", message });
+	steer(message: string, images: readonly PiImageInput[] = []): Promise<void> {
+		return this.request({ type: "steer", message, ...(images.length ? { images } : {}) });
 	}
 
-	followUp(message: string): Promise<void> {
-		return this.request({ type: "follow_up", message });
+	followUp(message: string, images: readonly PiImageInput[] = []): Promise<void> {
+		return this.request({ type: "follow_up", message, ...(images.length ? { images } : {}) });
 	}
 
 	abort(): Promise<void> {

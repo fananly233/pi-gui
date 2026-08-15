@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { desktopApi, type DesktopSessionInfo } from "../api/desktop-api";
-import type { ChatActivity, ChatDelivery, ChatMessage, PiConnectionState } from "../chat/chat-types";
+import type { ChatActivity, ChatDelivery, ChatImageAttachment, ChatMessage, PiConnectionState } from "../chat/chat-types";
 import { EventNormalizer, type NormalizedPiEvent } from "../pi/event-normalizer";
 import type { PiModelConfiguration, PiModelInfo, PiThinkingLevel } from "../models/model-state";
-import { PiAdapter, type PiAdapterEvent, type PiForkOption } from "../pi/pi-adapter";
+import { PiAdapter, type PiAdapterEvent, type PiForkOption, type PiImageInput } from "../pi/pi-adapter";
 import { parseSessionMessages } from "../sessions/session-message-parser";
 import {
 	SessionSelectionGuard,
@@ -701,11 +701,16 @@ export function usePiChat() {
 	}, [updateRuntime]);
 
 	const send = useCallback(
-		async (text: string, requestedDelivery: ChatDelivery) => {
+		async (text: string, requestedDelivery: ChatDelivery, attachments: readonly ChatImageAttachment[] = []) => {
 			const key = selection.current.activeKey;
 			const record = key ? runtimesRef.current.get(key) : null;
 			const message = text.trim();
-			if (!key || !record || record.snapshot.phase !== "ready" || record.snapshot.configuringModel || !message) return;
+			if (!key || !record || record.snapshot.phase !== "ready" || record.snapshot.configuringModel || (!message && attachments.length === 0)) return;
+			const images: PiImageInput[] = attachments.map((attachment) => ({
+				type: "image",
+				data: attachment.data,
+				mimeType: attachment.mimeType,
+			}));
 			const delivery: ChatDelivery = record.snapshot.activity === "idle"
 				? "prompt"
 				: requestedDelivery === "prompt"
@@ -714,16 +719,23 @@ export function usePiChat() {
 			const id = `user-${++userSequence.current}`;
 			updateRuntime(key, (snapshot) => ({
 				...snapshot,
-				messages: [...snapshot.messages, { id, role: "user", text: message, delivery, status: "accepted" }],
+				messages: [...snapshot.messages, {
+					id,
+					role: "user",
+					text: message,
+					delivery,
+					status: "accepted",
+					...(attachments.length ? { images: attachments.map(({ name, mimeType }) => ({ name, mimeType })) } : {}),
+				}],
 				lastError: null,
 				sending: true,
 				activity: delivery === "prompt" ? "running" : snapshot.activity,
 			}));
 
 			try {
-				if (delivery === "steer") await record.adapter.steer(message);
-				else if (delivery === "followUp") await record.adapter.followUp(message);
-				else await record.adapter.prompt(message);
+				if (delivery === "steer") await record.adapter.steer(message, images);
+				else if (delivery === "followUp") await record.adapter.followUp(message, images);
+				else await record.adapter.prompt(message, images);
 			} catch (error) {
 				updateRuntime(key, (snapshot) => ({
 					...snapshot,

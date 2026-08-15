@@ -79,6 +79,23 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Read-only MCO Scout | PASS WITH MANUAL VERIFICATION | The scoped model/auth inventory used `pi:deepseek/deepseek-v4-flash`; command names and login limitations were checked against the installed Pi 0.84.2 RPC docs/source before implementation. |
 | Static architecture scan | PASS | No Electron dependency or host directories, `window.piBridge`, Browser Agent, Channels, managed runtime, files, or terminal UI was introduced. |
 
+## Phase 5 verification (2026-08-14, Windows)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| `npm test` | PASS | Seventeen deterministic tests include `@file` query extraction, quoted path insertion, ranking, and the earlier chat/model/session coverage. |
+| `npm run check` | PASS | The workspace bridge types, file explorer/viewer, composer completion, and image attachment flow pass strict TypeScript. |
+| `npm run build:frontend` | PASS | 310 modules; 443.08 kB JavaScript and 35.02 kB CSS before gzip. |
+| `cargo check --manifest-path src-tauri/Cargo.toml` | PASS WITH EXISTING WARNING | The inherited Windows-only unused `app` setup parameter remains; no new Rust warning was introduced. |
+| `cargo test --lib --manifest-path src-tauri/Cargo.toml` | PASS | Eleven Rust tests include workspace listing/indexing, traversal/binary/oversize/symlink rejection, real save, and stale-content conflict preservation. |
+| `npm audit --omit=dev` | PASS | Zero production vulnerabilities. The six inherited development-tool advisories remain outside the production tree. |
+| Workspace filesystem boundary | PASS | Four narrow Rust commands replace direct WebView filesystem access. Paths are workspace-relative and canonicalized; generated directories and symlinks are skipped; preview/save are limited to existing UTF-8 text files up to 1 MiB. The recursive `$HOME` fs capabilities and direct fs plugin dependencies were removed. |
+| Real Windows Files UI | PASS | A connected real workspace loaded root and nested directories lazily, previewed a 75-byte UTF-8 file, inserted a normal `@path`, and quoted a path containing spaces. Save and external-change conflict behavior were exercised at the real filesystem layer by Rust tests; no UI save result is inferred from renderer-only automation. |
+| Real Windows image attachment UI | PASS | A repository-owned PNG was selected through the native Windows picker, previewed with its name/size, and removed. It was not sent to a provider. Installed Pi 0.84.2 RPC documentation confirms native image payloads for prompt, steer, and follow-up; the adapter forwards that shape without a custom host. |
+| Windows process lifecycle | PASS | `@file` attachment stayed disabled until a real session was ready. Closing the Tauri window ended the development session and left no owned Pi RPC or desktop process. |
+| Read-only MCO Scout | PASS WITH MANUAL VERIFICATION | One scoped `pi:deepseek/deepseek-v4-flash` Scout reviewed only the Phase 5 file paths. Its containment and permission recommendations were checked against the implementation and Rust tests. |
+| Static architecture scan | PASS | No Electron dependency or host directory, `window.piBridge`, Browser Agent, Channels, terminal/git UI, general WebView fs permission, or direct fs plugin dependency was introduced. |
+
 ## Migration decisions
 
 | Feature | DLYZZT source | Gustav source | Strategy | Priority | Risk | Verification |
@@ -92,11 +109,11 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Pi 0.84.2 event normalization | Electron agent host contracts | Current RPC event stream | REWRITE_MINIMAL | P0 | High | Delta-only `message_update`, strict LF JSONL, tool and abort tests. |
 | Sessions and history | Session contracts and presentation ideas | Rust session commands and Lit session browser | ADAPT | P0 | Medium | Phase 3 deterministic race tests, real session RPC gate, isolated Windows UI flows, and process-cleanup check. |
 | Models, providers, and authentication | React presentation ideas | Rust auth/provider discovery plus Pi model RPC | ADAPT | P1 | Medium | Phase 4 safe catalog tests, isolated auth-file tests, real model/thinking gate, restart/session isolation, and Windows UI checks. |
-| File browsing and editing | React file UI ideas | Tauri fs/dialog plugins and file viewer | ADAPT | P1 | Medium | Phase 5 open/save plus capability-scope checks. |
+| File browsing, editing, `@file`, and image attachments | React file UI ideas | Rust path helpers, native dialog, file-viewer semantics, and Pi image RPC | ADAPT | P1 | Medium | Phase 5 deterministic mention tests, Rust containment/save tests, and real Windows preview/attachment UI checks. |
 | Terminal, git, and worktrees | React presentation ideas | Shell capability allow-list and Rust git commands | ADAPT | P1 | High | Phase 6 shell lifecycle, git status, and worktree safety tests. |
 | Pi packages, extensions, skills, and prompts | Exclude Electron host implementations | Existing CLI/package commands and extension UI | ADAPT | P1 | Medium | Phase 7 real list/install/remove/update flows. |
 | Managed Pi runtime and release packaging | Bundled-tool concepts only | Existing Tauri sidecar discovery | DEFER | P2 | High | Phase 8 clean-machine install and upgrade gate. |
 | Electron main, preload, and agent host | `src/main`, `src/preload`, `src/agent-host` | None | DROP | P0 | Low | Static scan contains no Electron dependency or host bootstrap. |
 | Browser Agent and Channels | Browser and Channels trees | None | DROP | P0 | Low | Static scan contains no Browser Agent or Channels source. |
 
-Phase 4 adds a safe model catalog, provider grouping/search, per-session model and thinking controls, credential metadata, explicit stored-credential removal, and manual Pi TUI login guidance. Full model objects are reduced before entering React state so provider headers, endpoints, and credential material are not retained. Interactive login remains outside the GUI because Pi RPC 0.84.2 does not expose it; adding DLYZZT's Electron/Node auth host is explicitly out of scope. Files, terminal/git, package management, managed runtime, Browser Agent, Channels, and mock Pi behavior remain absent.
+Phase 5 adds a workspace-scoped native file explorer, bounded UTF-8 preview/editor, conflict-aware save, local `@file` completion/insertion, and image picker/paste/drop previews that map directly to Pi RPC image payloads. It does not expose a general filesystem bridge, create/delete files, import DLYZZT's Electron host, or claim an image-provider round trip that was not run. Terminal/git, package management, managed runtime, Browser Agent, Channels, and mock Pi behavior remain absent.

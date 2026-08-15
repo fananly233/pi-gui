@@ -46,12 +46,18 @@ export function App() {
 		if (workspacePath.trim()) localStorage.setItem(WORKSPACE_STORAGE_KEY, workspacePath.trim());
 	}, [workspacePath]);
 
+	const chooseWorkspace = useCallback(async () => {
+		const selected = await desktopApi.chooseWorkspace();
+		if (selected) setWorkspacePath(selected);
+	}, []);
+
 	return (
 		<AppShell
 			runtimeState={runtimeState}
 			onRetryRuntime={loadRuntimeInfo}
 			workspacePath={workspacePath}
 			onWorkspacePathChange={setWorkspacePath}
+			onChooseWorkspace={chooseWorkspace}
 			onConnect={() => chat.connect(workspacePath)}
 			chat={chat}
 		/>

@@ -16,8 +16,8 @@ This repository is a derivative work. The repository-level license remains MIT a
 - Upstream reference revision: `463b483e03c97696b45f7e5a418213ff95d358d6`
 - Local donor snapshot: `b214b7426415551ba764fcf23159c26ddbca30ef`
 - License: Apache License 2.0; see `LICENSES/DLYZZT-Apache-2.0.txt`.
-- Use in this repository: selected React shell and chat presentation concepts, warm paper design tokens, theme initialization behavior, and visual layout language.
-- Modifications: donor material is reduced and adapted to Tauri. The Phase 2 chat components are minimal rewrites rather than wholesale copies, while the Pi protocol adapter targets Gustav's native Tauri commands; Electron main/preload/agent-host, Browser Agent, Channels, and Settings implementations are not incorporated.
+- Use in this repository: selected React shell, chat, file-tree, file-viewer, and `@file` completion concepts; warm paper design tokens, theme initialization behavior, and visual layout language.
+- Modifications: donor material is reduced and adapted to Tauri. Chat and file components are minimal rewrites rather than wholesale copies, while the Pi protocol adapter and workspace-scoped filesystem bridge target Gustav's native Tauri/Rust boundary; Electron main/preload/agent-host, Browser Agent, Channels, and Settings implementations are not incorporated.
 
 ## Karpathy Guidelines skill
 

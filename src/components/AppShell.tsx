@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { DesktopRuntimeInfo } from "../api/desktop-api";
 import type { PiChatController } from "../hooks/usePiChat";
 import { applyTheme, readStoredTheme, storeTheme, type Theme } from "../theme";
 import { ChatWindow } from "./ChatWindow";
+import { FilesPanel } from "./FilesPanel";
 import { SessionSidebar } from "./SessionSidebar";
 import { TitleBar } from "./TitleBar";
 
@@ -16,6 +17,7 @@ type AppShellProps = {
 	onRetryRuntime: () => Promise<void>;
 	workspacePath: string;
 	onWorkspacePathChange: (path: string) => void;
+	onChooseWorkspace: () => Promise<void>;
 	onConnect: () => Promise<void>;
 	chat: PiChatController;
 };
@@ -33,10 +35,15 @@ function RuntimePanel({ state, onRetry }: { state: RuntimeState; onRetry: () => 
 	return <span title={`${state.info.platform} / ${state.info.arch}`}>Tauri v{state.info.version}</span>;
 }
 
-export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorkspacePathChange, onConnect, chat }: AppShellProps) {
+export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorkspacePathChange, onChooseWorkspace, onConnect, chat }: AppShellProps) {
 	const [theme, setTheme] = useState<Theme>(() => readStoredTheme());
+	const [filesOpen, setFilesOpen] = useState(false);
+	const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+	const [fileMentionSeed, setFileMentionSeed] = useState<{ id: number; path: string } | null>(null);
+	const fileMentionSequence = useRef(0);
 	const connectionBusy = chat.connection.status === "connecting";
 	const connected = chat.connection.status === "connected";
+	const workspaceRoot = connected ? workspacePath.trim() || null : null;
 	const connectionTone = chat.sessionReady ? (chat.activity === "idle" ? "ready" : "loading") : connected ? "ready" : connectionBusy ? "loading" : chat.connection.status === "error" ? "error" : "muted";
 
 	const toggleTheme = () => {
@@ -44,6 +51,14 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 		applyTheme(nextTheme);
 		storeTheme(nextTheme);
 		setTheme(nextTheme);
+	};
+
+	useEffect(() => {
+		setSelectedFilePath(null);
+	}, [workspacePath]);
+
+	const mentionFile = (path: string) => {
+		setFileMentionSeed({ id: ++fileMentionSequence.current, path });
 	};
 
 	return (
@@ -67,15 +82,18 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 						</div>
 
 						<label htmlFor="workspace-path">Working directory</label>
-						<input
-							id="workspace-path"
-							data-testid="workspace-path"
-							type="text"
-							value={workspacePath}
-							onChange={(event) => onWorkspacePathChange(event.target.value)}
-							disabled={connectionBusy || connected}
-							spellCheck={false}
-						/>
+						<div className="workspace-picker">
+							<input
+								id="workspace-path"
+								data-testid="workspace-path"
+								type="text"
+								value={workspacePath}
+								onChange={(event) => onWorkspacePathChange(event.target.value)}
+								disabled={connectionBusy || connected}
+								spellCheck={false}
+							/>
+							<button type="button" className="icon-button workspace-picker__button" onClick={() => void onChooseWorkspace()} disabled={connectionBusy || connected} title="Choose workspace folder">…</button>
+						</div>
 
 						{connected ? (
 							<button type="button" className="button button--secondary connection-button" onClick={() => void chat.disconnect()}>
@@ -107,7 +125,7 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 					</div>
 				</aside>
 
-				<main className="workspace workspace--chat">
+				<main className={`workspace workspace--chat${filesOpen ? " workspace--files-open" : ""}`}>
 					<ChatWindow
 						connection={chat.connection}
 						activity={chat.activity}
@@ -134,7 +152,21 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 						send={chat.send}
 						abort={chat.abort}
 						clearError={chat.clearError}
+						workspaceRoot={workspaceRoot}
+						fileMentionSeed={fileMentionSeed}
+						filesOpen={filesOpen}
+						onToggleFiles={() => setFilesOpen((value) => !value)}
 					/>
+					{filesOpen ? (
+						<FilesPanel
+							workspaceRoot={workspaceRoot}
+							selectedPath={selectedFilePath}
+							onSelectPath={setSelectedFilePath}
+							onMentionFile={mentionFile}
+							canMention={chat.sessionReady}
+							onClose={() => setFilesOpen(false)}
+						/>
+					) : null}
 				</main>
 			</div>
 		</div>

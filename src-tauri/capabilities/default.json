@@ -27,23 +27,6 @@
 		"shell:default",
 		"shell:allow-open",
 		"shell:allow-kill",
-		"fs:default",
-		{
-			"identifier": "fs:allow-home-read-recursive",
-			"allow": [
-				"$HOME/**",
-				"$HOME/**/.*",
-				"$HOME/**/.*/**"
-			]
-		},
-		{
-			"identifier": "fs:allow-home-write-recursive",
-			"allow": [
-				"$HOME/**",
-				"$HOME/**/.*",
-				"$HOME/**/.*/**"
-			]
-		},
 		"dialog:default",
 		"dialog:allow-open",
 		"notification:default",

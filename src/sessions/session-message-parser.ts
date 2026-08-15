@@ -22,6 +22,17 @@ function assistantStatus(message: JsonObject): "complete" | "aborted" | "error" 
 	return "complete";
 }
 
+function imagesFromContent(content: unknown): { name: string; mimeType: string }[] {
+	if (!Array.isArray(content)) return [];
+	return content
+		.map(asObject)
+		.filter((block): block is JsonObject => block !== null && block.type === "image")
+		.map((block, index) => ({
+			name: `Attached image ${index + 1}`,
+			mimeType: typeof block.mimeType === "string" ? block.mimeType : "image",
+		}));
+}
+
 export function parseSessionMessages(messages: JsonObject[]): ChatMessage[] {
 	const parsed: ChatMessage[] = [];
 
@@ -29,7 +40,15 @@ export function parseSessionMessages(messages: JsonObject[]): ChatMessage[] {
 		const message = messages[index];
 		if (message.role === "user") {
 			const text = textFromContent(message.content);
-			if (text) parsed.push({ id: `history-user-${index}`, role: "user", text, delivery: "prompt", status: "accepted" });
+			const images = imagesFromContent(message.content);
+			if (text || images.length) parsed.push({
+				id: `history-user-${index}`,
+				role: "user",
+				text,
+				delivery: "prompt",
+				status: "accepted",
+				...(images.length ? { images } : {}),
+			});
 			continue;
 		}
 

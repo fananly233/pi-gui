@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::UNIX_EPOCH;
@@ -1136,6 +1136,352 @@ async fn get_session_content(app: AppHandle, session_path: String) -> Result<Str
     let sessions_dir = get_pi_sessions_dir(&app)?;
     let requested = PathBuf::from(session_path.trim());
     read_session_file(&sessions_dir, &requested)
+}
+
+const MAX_WORKSPACE_FILE_BYTES: u64 = 1024 * 1024;
+const MAX_WORKSPACE_DIRECTORY_ENTRIES: usize = 2_000;
+const MAX_WORKSPACE_INDEX_ENTRIES: usize = 5_000;
+const MAX_WORKSPACE_INDEX_DEPTH: usize = 8;
+
+#[derive(Debug, Serialize)]
+struct WorkspaceEntry {
+    name: String,
+    path: String,
+    is_dir: bool,
+    size: u64,
+    modified_at: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct WorkspaceDirectory {
+    path: String,
+    entries: Vec<WorkspaceEntry>,
+    truncated: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct WorkspaceFileIndex {
+    files: Vec<String>,
+    truncated: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct WorkspaceTextFile {
+    path: String,
+    content: String,
+    size: u64,
+    modified_at: u64,
+}
+
+fn workspace_relative_path(raw: &str, allow_empty: bool) -> Result<PathBuf, String> {
+    if raw.contains('\0') {
+        return Err("Workspace paths cannot contain NUL characters".to_string());
+    }
+    if raw.is_empty() {
+        return if allow_empty {
+            Ok(PathBuf::new())
+        } else {
+            Err("Choose a workspace file first".to_string())
+        };
+    }
+
+    let path = PathBuf::from(raw);
+    if path.is_absolute()
+        || path.components().any(|component| {
+            matches!(
+                component,
+                Component::ParentDir | Component::RootDir | Component::Prefix(_)
+            )
+        })
+    {
+        return Err(
+            "Workspace file paths must stay relative to the selected workspace".to_string(),
+        );
+    }
+    Ok(path)
+}
+
+fn canonical_workspace_root(workspace_root: &str) -> Result<PathBuf, String> {
+    let requested = workspace_root.trim();
+    if requested.is_empty() {
+        return Err("Choose a workspace first".to_string());
+    }
+    let root = fs::canonicalize(requested)
+        .map_err(|e| format!("Could not resolve the selected workspace: {}", e))?;
+    if !root.is_dir() {
+        return Err("The selected workspace is not a directory".to_string());
+    }
+    Ok(root)
+}
+
+fn ensure_inside_workspace(root: &Path, target: PathBuf) -> Result<PathBuf, String> {
+    let resolved = fs::canonicalize(&target)
+        .map_err(|e| format!("Could not resolve workspace path: {}", e))?;
+    if !resolved.starts_with(root) {
+        return Err("Refusing to access a path outside the selected workspace".to_string());
+    }
+    Ok(resolved)
+}
+
+fn path_to_workspace_string(path: &Path) -> Option<String> {
+    let mut parts = Vec::new();
+    for component in path.components() {
+        match component {
+            Component::Normal(value) => parts.push(value.to_str()?.to_string()),
+            Component::CurDir => {}
+            _ => return None,
+        }
+    }
+    Some(parts.join("/"))
+}
+
+fn workspace_modified_at(metadata: &fs::Metadata) -> u64 {
+    metadata
+        .modified()
+        .ok()
+        .and_then(|value| value.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis().min(u64::MAX as u128) as u64)
+        .unwrap_or(0)
+}
+
+fn is_ignored_workspace_directory(name: &str) -> bool {
+    matches!(
+        name,
+        "node_modules"
+            | ".git"
+            | ".next"
+            | "dist"
+            | "build"
+            | "target"
+            | "coverage"
+            | "__pycache__"
+            | ".turbo"
+            | ".cache"
+            | ".pytest_cache"
+            | ".mypy_cache"
+    )
+}
+
+fn list_workspace_directory_impl(
+    root: &Path,
+    relative_path: &str,
+) -> Result<WorkspaceDirectory, String> {
+    let relative = workspace_relative_path(relative_path, true)?;
+    let directory = ensure_inside_workspace(root, root.join(&relative))?;
+    if !directory.is_dir() {
+        return Err("The requested workspace path is not a directory".to_string());
+    }
+
+    let mut entries = Vec::new();
+    let mut truncated = false;
+    let read_dir = fs::read_dir(&directory)
+        .map_err(|e| format!("Could not list workspace directory: {}", e))?;
+    for entry in read_dir {
+        let entry = entry.map_err(|e| format!("Could not read workspace entry: {}", e))?;
+        let file_type = match entry.file_type() {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        if file_type.is_symlink() {
+            continue;
+        }
+        let Some(name) = entry.file_name().to_str().map(str::to_string) else {
+            continue;
+        };
+        if file_type.is_dir() && is_ignored_workspace_directory(&name) {
+            continue;
+        }
+        let metadata = match entry.metadata() {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        if !metadata.is_dir() && !metadata.is_file() {
+            continue;
+        }
+        let child_relative = relative.join(&name);
+        let Some(path) = path_to_workspace_string(&child_relative) else {
+            continue;
+        };
+        entries.push(WorkspaceEntry {
+            name,
+            path,
+            is_dir: metadata.is_dir(),
+            size: if metadata.is_file() {
+                metadata.len()
+            } else {
+                0
+            },
+            modified_at: workspace_modified_at(&metadata),
+        });
+        if entries.len() == MAX_WORKSPACE_DIRECTORY_ENTRIES {
+            truncated = true;
+            break;
+        }
+    }
+
+    entries.sort_by(|left, right| {
+        right
+            .is_dir
+            .cmp(&left.is_dir)
+            .then_with(|| left.name.to_lowercase().cmp(&right.name.to_lowercase()))
+            .then_with(|| left.name.cmp(&right.name))
+    });
+    Ok(WorkspaceDirectory {
+        path: path_to_workspace_string(&relative).unwrap_or_default(),
+        entries,
+        truncated,
+    })
+}
+
+fn index_workspace_files_impl(root: &Path) -> Result<WorkspaceFileIndex, String> {
+    let mut files = Vec::new();
+    let mut directories = vec![(root.to_path_buf(), PathBuf::new(), 0_usize)];
+    let mut truncated = false;
+
+    while let Some((directory, relative, depth)) = directories.pop() {
+        let read_dir = match fs::read_dir(&directory) {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+        for entry in read_dir.flatten() {
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
+            let Some(name) = entry.file_name().to_str().map(str::to_string) else {
+                continue;
+            };
+            let child_relative = relative.join(&name);
+            if file_type.is_dir() {
+                if is_ignored_workspace_directory(&name) {
+                    continue;
+                }
+                if depth < MAX_WORKSPACE_INDEX_DEPTH {
+                    directories.push((entry.path(), child_relative, depth + 1));
+                } else {
+                    truncated = true;
+                }
+                continue;
+            }
+            if !file_type.is_file() {
+                continue;
+            }
+            if let Some(path) = path_to_workspace_string(&child_relative) {
+                files.push(path);
+            }
+            if files.len() == MAX_WORKSPACE_INDEX_ENTRIES {
+                truncated = true;
+                directories.clear();
+                break;
+            }
+        }
+    }
+
+    files.sort_by_key(|path| path.to_lowercase());
+    Ok(WorkspaceFileIndex { files, truncated })
+}
+
+fn resolve_workspace_file(root: &Path, relative_path: &str) -> Result<PathBuf, String> {
+    let relative = workspace_relative_path(relative_path, false)?;
+    let target = ensure_inside_workspace(root, root.join(relative))?;
+    if !target.is_file() {
+        return Err("The requested workspace path is not a file".to_string());
+    }
+    Ok(target)
+}
+
+fn read_workspace_text_file_impl(
+    root: &Path,
+    relative_path: &str,
+) -> Result<WorkspaceTextFile, String> {
+    let target = resolve_workspace_file(root, relative_path)?;
+    let metadata =
+        fs::metadata(&target).map_err(|e| format!("Could not inspect workspace file: {}", e))?;
+    if metadata.len() > MAX_WORKSPACE_FILE_BYTES {
+        return Err(format!(
+            "File is too large for the built-in editor (maximum {} MiB)",
+            MAX_WORKSPACE_FILE_BYTES / 1024 / 1024
+        ));
+    }
+    let bytes = fs::read(&target).map_err(|e| format!("Could not read workspace file: {}", e))?;
+    if bytes.len() as u64 > MAX_WORKSPACE_FILE_BYTES {
+        return Err(format!(
+            "File is too large for the built-in editor (maximum {} MiB)",
+            MAX_WORKSPACE_FILE_BYTES / 1024 / 1024
+        ));
+    }
+    if bytes.contains(&0) {
+        return Err("Binary files cannot be opened in the text editor".to_string());
+    }
+    let content = String::from_utf8(bytes)
+        .map_err(|_| "Binary or non-UTF-8 files cannot be opened in the text editor".to_string())?;
+    let final_metadata = fs::metadata(&target)
+        .map_err(|e| format!("Could not inspect workspace file after reading: {}", e))?;
+    Ok(WorkspaceTextFile {
+        path: relative_path.to_string(),
+        size: content.len() as u64,
+        modified_at: workspace_modified_at(&final_metadata),
+        content,
+    })
+}
+
+fn write_workspace_text_file_impl(
+    root: &Path,
+    relative_path: &str,
+    content: &str,
+    expected_content: &str,
+) -> Result<WorkspaceTextFile, String> {
+    if content.len() as u64 > MAX_WORKSPACE_FILE_BYTES {
+        return Err(format!(
+            "File is too large for the built-in editor (maximum {} MiB)",
+            MAX_WORKSPACE_FILE_BYTES / 1024 / 1024
+        ));
+    }
+    let current = read_workspace_text_file_impl(root, relative_path)?;
+    if current.content != expected_content {
+        return Err("File changed on disk. Reload it before saving your edits".to_string());
+    }
+    let target = resolve_workspace_file(root, relative_path)?;
+    fs::write(&target, content.as_bytes())
+        .map_err(|e| format!("Could not save workspace file: {}", e))?;
+    read_workspace_text_file_impl(root, relative_path)
+}
+
+#[tauri::command]
+async fn list_workspace_directory(
+    workspace_root: String,
+    relative_path: String,
+) -> Result<WorkspaceDirectory, String> {
+    let root = canonical_workspace_root(&workspace_root)?;
+    list_workspace_directory_impl(&root, &relative_path)
+}
+
+#[tauri::command]
+async fn index_workspace_files(workspace_root: String) -> Result<WorkspaceFileIndex, String> {
+    let root = canonical_workspace_root(&workspace_root)?;
+    index_workspace_files_impl(&root)
+}
+
+#[tauri::command]
+async fn read_workspace_file(
+    workspace_root: String,
+    relative_path: String,
+) -> Result<WorkspaceTextFile, String> {
+    let root = canonical_workspace_root(&workspace_root)?;
+    read_workspace_text_file_impl(&root, &relative_path)
+}
+
+#[tauri::command]
+async fn write_workspace_file(
+    workspace_root: String,
+    relative_path: String,
+    content: String,
+    expected_content: String,
+) -> Result<WorkspaceTextFile, String> {
+    let root = canonical_workspace_root(&workspace_root)?;
+    write_workspace_text_file_impl(&root, &relative_path, &content, &expected_content)
 }
 
 #[derive(Debug, Serialize)]
@@ -2507,7 +2853,6 @@ async fn open_path_in_default_app(path: String) -> Result<(), String> {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
@@ -2531,6 +2876,10 @@ pub fn run() {
             list_sessions,
             delete_session,
             get_session_content,
+            list_workspace_directory,
+            index_workspace_files,
+            read_workspace_file,
+            write_workspace_file,
             get_pi_auth_status,
             get_pi_oauth_providers,
             clear_pi_provider_auth,
@@ -2565,7 +2914,9 @@ pub fn run() {
 mod tests {
     use super::{
         auth_provider_statuses_from_file, clear_provider_auth_file, delete_session_file,
-        normalize_auth_provider, read_session_file,
+        index_workspace_files_impl, list_workspace_directory_impl, normalize_auth_provider,
+        read_session_file, read_workspace_text_file_impl, write_workspace_text_file_impl,
+        MAX_WORKSPACE_FILE_BYTES,
     };
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -2621,6 +2972,106 @@ mod tests {
             "{\"type\":\"session\"}\n"
         );
         assert!(read_session_file(&sessions, &outside).is_err());
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn lists_and_indexes_only_regular_workspace_entries() {
+        let root = test_root();
+        let workspace = root.join("workspace");
+        fs::create_dir_all(workspace.join("src")).expect("create source directory");
+        fs::create_dir_all(workspace.join("node_modules")).expect("create ignored directory");
+        fs::create_dir_all(workspace.join(".git")).expect("create git directory");
+        fs::write(workspace.join("README.md"), "hello\n").expect("write root file");
+        fs::write(workspace.join("src").join("main.ts"), "export {};\n")
+            .expect("write nested file");
+        fs::write(
+            workspace.join("node_modules").join("ignored.js"),
+            "ignored\n",
+        )
+        .expect("write ignored file");
+        let canonical = fs::canonicalize(&workspace).expect("canonical workspace");
+
+        let directory = list_workspace_directory_impl(&canonical, "").expect("list workspace");
+        assert_eq!(
+            directory
+                .entries
+                .iter()
+                .map(|entry| entry.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["src", "README.md"]
+        );
+        assert!(!directory.truncated);
+
+        let index = index_workspace_files_impl(&canonical).expect("index workspace");
+        assert_eq!(index.files, vec!["README.md", "src/main.ts"]);
+        assert!(!index.truncated);
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn workspace_reads_reject_traversal_binary_and_symlink_escape() {
+        let root = test_root();
+        let workspace = root.join("workspace");
+        fs::create_dir_all(&workspace).expect("create workspace");
+        fs::write(workspace.join("notes.txt"), "safe\n").expect("write text file");
+        fs::write(workspace.join("binary.bin"), [0_u8, 1, 2]).expect("write binary file");
+        fs::write(
+            workspace.join("large.txt"),
+            vec![b'x'; MAX_WORKSPACE_FILE_BYTES as usize + 1],
+        )
+        .expect("write oversized file");
+        let outside = root.join("outside.txt");
+        fs::write(&outside, "secret\n").expect("write outside file");
+        let canonical = fs::canonicalize(&workspace).expect("canonical workspace");
+
+        assert_eq!(
+            read_workspace_text_file_impl(&canonical, "notes.txt")
+                .expect("read workspace text")
+                .content,
+            "safe\n"
+        );
+        assert!(read_workspace_text_file_impl(&canonical, "../outside.txt").is_err());
+        assert!(read_workspace_text_file_impl(&canonical, "binary.bin").is_err());
+        assert!(read_workspace_text_file_impl(&canonical, "large.txt").is_err());
+
+        let link = workspace.join("outside-link.txt");
+        #[cfg(unix)]
+        let linked = std::os::unix::fs::symlink(&outside, &link).is_ok();
+        #[cfg(windows)]
+        let linked = std::os::windows::fs::symlink_file(&outside, &link).is_ok();
+        if linked {
+            assert!(read_workspace_text_file_impl(&canonical, "outside-link.txt").is_err());
+            let directory = list_workspace_directory_impl(&canonical, "").expect("list workspace");
+            assert!(!directory
+                .entries
+                .iter()
+                .any(|entry| entry.name == "outside-link.txt"));
+        }
+
+        fs::remove_dir_all(&root).expect("clean test root");
+    }
+
+    #[test]
+    fn workspace_save_refuses_to_overwrite_external_changes() {
+        let root = test_root();
+        let workspace = root.join("workspace");
+        fs::create_dir_all(&workspace).expect("create workspace");
+        let file = workspace.join("notes.txt");
+        fs::write(&file, "first\n").expect("write initial file");
+        let canonical = fs::canonicalize(&workspace).expect("canonical workspace");
+
+        let saved = write_workspace_text_file_impl(&canonical, "notes.txt", "second\n", "first\n")
+            .expect("save matching revision");
+        assert_eq!(saved.content, "second\n");
+        fs::write(&file, "external\n").expect("write external change");
+        let error = write_workspace_text_file_impl(&canonical, "notes.txt", "third\n", "second\n")
+            .expect_err("stale revision must fail");
+        assert!(error.contains("changed on disk"));
+        assert_eq!(
+            fs::read_to_string(&file).expect("read preserved external change"),
+            "external\n"
+        );
         fs::remove_dir_all(&root).expect("clean test root");
     }
 

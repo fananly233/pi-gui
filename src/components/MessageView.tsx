@@ -19,7 +19,14 @@ export function MessageView({ message }: { message: ChatMessage }) {
 					<span>{deliveryLabel}</span>
 					{message.status === "failed" ? <span>Not accepted</span> : null}
 				</div>
-				<p>{message.text}</p>
+				{message.text ? <p>{message.text}</p> : null}
+				{message.images?.length ? (
+					<div className="message__attachments" aria-label="Image attachments">
+						{message.images.map((image, index) => (
+							<span key={`${image.name}:${index}`} title={image.mimeType}>▧ {image.name}</span>
+						))}
+					</div>
+				) : null}
 			</article>
 		);
 	}

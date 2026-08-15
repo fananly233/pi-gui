@@ -9,19 +9,28 @@ Current capability file:
 
 The app needs to:
 - launch and communicate with Pi runtime processes
-- read/write project and session files
+- read Pi session files through dedicated Rust commands
+- list, index, read, and save files inside the explicitly selected workspace
 - open files/folders through native dialogs
 - show native notifications
 - manage window interactions
 
-## Important consideration
+## Workspace file boundary
 
-The current default capability includes broad `$HOME` recursive fs read/write allow rules.
-This is practical for local coding workflows, but you should review and tighten this policy for stricter environments.
+The WebView does not receive `fs:default` or recursive `$HOME` read/write permissions. Project files are exposed only through narrow Rust commands that:
+
+- accept a selected workspace root plus a relative path
+- canonicalize both the root and target before access
+- reject absolute paths, `..` traversal, and symbolic-link escapes
+- skip symbolic links and noisy generated directories in the explorer/index
+- reject binary, non-UTF-8, and text files larger than 1 MiB
+- require the original content when saving so an external edit is never overwritten silently
+
+There is no general delete command and the Phase 5 editor only saves existing files.
 
 ## Recommendation for enterprise/restricted environments
 
 - fork and tailor `default.json`
-- limit allowed filesystem paths to intended workspace roots
+- keep project access behind the workspace-scoped Rust commands
 - review shell execute allowlists
 - validate package installation/update policies

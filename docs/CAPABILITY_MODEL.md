@@ -10,6 +10,17 @@ Pi Desktop is a **capability host** for the Pi ecosystem.
 
 This keeps app-core lightweight while enabling ecosystem-driven behavior.
 
+## Workspace file capability contract
+
+The renderer never receives a general-purpose filesystem API. Phase 5 project access is provided by four Rust commands:
+
+- `list_workspace_directory`
+- `index_workspace_files`
+- `read_workspace_file`
+- `write_workspace_file`
+
+Each command is scoped to a canonical workspace root and relative path. The file index exists only for `@file` completion; image attachments use Pi RPC's native `images` payload and are not written to disk by the desktop app.
+
 ---
 
 ## Extension UI capability contract

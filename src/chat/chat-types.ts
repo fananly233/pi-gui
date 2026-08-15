@@ -1,12 +1,26 @@
 export type ChatDelivery = "prompt" | "steer" | "followUp";
 export type ChatActivity = "idle" | "running" | "retrying";
 
+export type ChatImageAttachment = Readonly<{
+	name: string;
+	mimeType: string;
+	data: string;
+	previewUrl: string;
+	size: number;
+}>;
+
+export type ChatImageSummary = Readonly<{
+	name: string;
+	mimeType: string;
+}>;
+
 export type UserChatMessage = {
 	id: string;
 	role: "user";
 	text: string;
 	delivery: ChatDelivery;
 	status: "accepted" | "failed";
+	images?: ChatImageSummary[];
 };
 
 export type AssistantChatMessage = {

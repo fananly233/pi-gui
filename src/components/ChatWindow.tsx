@@ -31,7 +31,12 @@ type ChatWindowProps = Pick<
 	| "setModel"
 	| "setThinkingLevel"
 	| "disconnect"
->;
+> & {
+	workspaceRoot: string | null;
+	fileMentionSeed: { id: number; path: string } | null;
+	filesOpen: boolean;
+	onToggleFiles: () => void;
+};
 
 function baseName(path: string | null): string | null {
 	if (!path) return null;
@@ -75,6 +80,10 @@ export function ChatWindow(props: ChatWindowProps) {
 					<h2 title={props.activeSessionPath ?? undefined}>{sessionLabel}</h2>
 				</div>
 				<div className="chat-header__actions">
+					<button type="button" className={`files-trigger${props.filesOpen ? " is-active" : ""}`} onClick={props.onToggleFiles} data-testid="files-button">
+						<span aria-hidden="true">▤</span>
+						Files
+					</button>
 					<button type="button" className="model-trigger" data-testid="models-auth-button" onClick={() => setModelsOpen(true)}>
 						<span>Model</span>
 						<strong>{props.model?.name ?? "Models & auth"}</strong>
@@ -112,7 +121,18 @@ export function ChatWindow(props: ChatWindowProps) {
 				</div>
 			) : null}
 
-			<ChatInput connected={connected} activity={props.activity} sending={props.sending} aborting={props.aborting} configuringModel={props.configuringModel} onSend={props.send} onAbort={props.abort} seed={props.composerSeed} />
+			<ChatInput
+				connected={connected}
+				activity={props.activity}
+				sending={props.sending}
+				aborting={props.aborting}
+				configuringModel={props.configuringModel}
+				onSend={props.send}
+				onAbort={props.abort}
+				seed={props.composerSeed}
+				workspaceRoot={props.workspaceRoot}
+				fileMentionSeed={props.fileMentionSeed}
+			/>
 		</section>
 	);
 }
