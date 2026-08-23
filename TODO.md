@@ -46,8 +46,8 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Keep the active `main` merge metadata on the GitHub noreply identity and pass `npm run check:publish` after integration.
 - [x] Pass mainline CI and **Windows Clean-Machine Candidate** for `3bb7cc411467fece7d5dbe5edf083d78a836a456`.
 - [x] Audit the Windows signing routes and add a credential-free preflight for the checked-in PFX gate, verification order, and Windows-only artifact scope.
-- [ ] Delete and verify absence of the known local `%TEMP%\pi-gui-phase9-ui-*` Pi configuration copies; leave the app-data quarantine and unrelated native-test directories untouched.
-- [ ] Explicitly accept PR #1's obsolete metadata-only merge object or authorize an eligible GitHub Support cleanup request.
+- [x] With explicit maintainer approval, move the entire known local `%TEMP%\pi-gui-phase9-ui-e97f42c987594cce899a018465edcc3f` fixture to the Recycle Bin and verify its original Pi configuration paths absent; the app-data quarantine and unrelated Phase 10A native-test directories remained untouched.
+- [x] Record the maintainer's explicit acceptance of PR #1's obsolete metadata-only merge object; no GitHub Support cleanup request is being pursued for `0.1.0`.
 - [ ] Select the Windows signing route: eligible exportable PFX, or a separately reviewed provider-specific `signCommand` implementation.
 - [ ] Configure Windows Authenticode signing for NSIS and MSI only after the route is selected.
 - [ ] Build a draft release from the intended tag.

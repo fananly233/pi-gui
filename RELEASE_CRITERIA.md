@@ -24,8 +24,8 @@ The current local RC stabilization record is maintained in [docs/RC_ACCEPTANCE.m
 - [x] No `.env`, Pi auth/session data, local app data, signing material, logs, personal paths, or local orchestration notes are tracked.
 - [x] Remote URLs contain no embedded credentials.
 - [x] Only the reviewed Pi GUI history was pushed. Never use `git push --all` or `git push --mirror`; `archive/electron-mvp` is a local donor-work archive.
-- [ ] Delete the known `%TEMP%\pi-gui-phase9-ui-*` copies of Pi auth/settings/model-store data and verify that the copied files are absent. Do not delete the app-data quarantine or unrelated native-test directories as part of this item.
-- [ ] Record the maintainer's decision for PR #1's obsolete metadata-only merge object: request eligible cleanup from GitHub Support, or explicitly accept the residual. The active mainline and public profile already use privacy-safe metadata.
+- [x] With explicit maintainer approval, move the entire known `%TEMP%\pi-gui-phase9-ui-e97f42c987594cce899a018465edcc3f` fixture to the Recycle Bin and verify that its original path plus the copied Pi auth/settings/model-store files are absent. The app-data quarantine and unrelated Phase 10A native-test directories remained present and untouched.
+- [x] Record the maintainer's explicit acceptance of PR #1's obsolete metadata-only merge object. The active mainline and public profile use privacy-safe metadata; no GitHub Support cleanup request is being pursued for `0.1.0`.
 
 Changing existing commit author/committer metadata rewrites commit hashes. It requires explicit approval and must happen before the first public push.
 

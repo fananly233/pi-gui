@@ -18,12 +18,11 @@ Phases 1–8 are implemented:
 - Pi package operations and runtime resource discovery;
 - verified, versioned, app-owned Pi runtime with rollback and system-Pi fallback.
 
-The independent repository, public metadata, attribution, derivative commit-identity cleanup, Phase 9 RC stabilization, Phase 10A mainline integration, and final unsigned Windows install lifecycle are complete. The remaining `0.1.0` work is privacy closure and release engineering, not feature expansion:
+The independent repository, public metadata, attribution, derivative commit-identity cleanup, local privacy closure, Phase 9 RC stabilization, Phase 10A mainline integration, and final unsigned Windows install lifecycle are complete. The remaining `0.1.0` work is release engineering, not feature expansion:
 
-1. delete the known local sensitive fixture copies and record the decision for the historical GitHub PR metadata residual;
-2. select an eligible exportable-PFX or provider-specific Windows signing route, then configure trusted Authenticode signing for NSIS and MSI;
-3. build a signed draft from the exact intended tag and pass Signed Windows Release Smoke;
-4. publish the first Pi GUI release only after those gates pass.
+1. select an eligible exportable-PFX or provider-specific Windows signing route, then configure trusted Authenticode signing for NSIS and MSI;
+2. build a signed draft from the exact intended tag and pass Signed Windows Release Smoke;
+3. publish the first Pi GUI release only after those gates pass.
 
 ## After 0.1
 
