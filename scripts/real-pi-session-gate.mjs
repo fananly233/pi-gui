@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
+import { createIsolatedPiEnvironment, isolatedDiscoveryArgs } from "./real-pi-gate-environment.mjs";
 
 const provider = process.env.PI_GUI_GATE_PROVIDER || "deepseek";
 const model = process.env.PI_GUI_GATE_MODEL || "deepseek-v4-flash";
@@ -28,8 +29,9 @@ async function listJsonlFiles(directory) {
 }
 
 class PersistentPiHarness {
-	constructor(sessionDir) {
+	constructor(sessionDir, environment) {
 		this.sessionDir = sessionDir;
+		this.environment = environment;
 		this.child = null;
 		this.stdoutBuffer = "";
 		this.stderr = "";
@@ -42,13 +44,13 @@ class PersistentPiHarness {
 	}
 
 	start() {
-		const piArgs = ["--mode", "rpc", "--session-dir", this.sessionDir, "--provider", provider, "--model", model];
+		const piArgs = ["--mode", "rpc", "--session-dir", this.sessionDir, "--provider", provider, "--model", model, ...isolatedDiscoveryArgs];
 		const command = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "pi";
 		const args = process.platform === "win32" ? ["/d", "/s", "/c", "pi.cmd", ...piArgs] : piArgs;
 
 		this.child = spawn(command, args, {
 			cwd,
-			env: { ...process.env, NO_COLOR: "1" },
+			env: this.environment,
 			stdio: ["pipe", "pipe", "pipe"],
 			windowsHide: true,
 		});
@@ -167,7 +169,8 @@ const keepSessionDir = process.env.PI_GUI_GATE_KEEP_SESSIONS === "1";
 const ownsSessionDir = !requestedSessionDir;
 const sessionDir = requestedSessionDir || (await mkdtemp(join(tmpdir(), "pi-gui-phase3-")));
 if (requestedSessionDir) await mkdir(sessionDir, { recursive: true });
-const harness = new PersistentPiHarness(sessionDir);
+const isolatedPi = await createIsolatedPiEnvironment("pi-gui-phase9-sessions-");
+const harness = new PersistentPiHarness(sessionDir, isolatedPi.environment);
 let restartedHarness = null;
 
 try {
@@ -257,7 +260,7 @@ try {
 	const files = await listJsonlFiles(sessionDir);
 	assert.ok(files.length >= 3, `Expected at least three persisted session files, found ${files.length}.`);
 
-	restartedHarness = new PersistentPiHarness(sessionDir);
+	restartedHarness = new PersistentPiHarness(sessionDir, isolatedPi.environment);
 	restartedHarness.start();
 	const restartedState = await restartedHarness.request({ type: "get_state" });
 	assert.equal(restartedState.data?.model?.provider, provider);
@@ -276,8 +279,12 @@ try {
 	if (harness.stderr.trim()) console.error(`[session-gate] pi stderr:\n${harness.stderr.trim().slice(-4000)}`);
 	process.exitCode = 1;
 } finally {
-	await harness.stop();
-	await restartedHarness?.stop();
-	if (keepSessionDir || !ownsSessionDir) console.log(`[session-gate] preserved isolated sessions: ${sessionDir}`);
-	else await rm(sessionDir, { recursive: true, force: true });
+	try {
+		await harness.stop();
+		await restartedHarness?.stop();
+		if (keepSessionDir || !ownsSessionDir) console.log(`[session-gate] preserved isolated sessions: ${sessionDir}`);
+		else await rm(sessionDir, { recursive: true, force: true });
+	} finally {
+		await isolatedPi.dispose();
+	}
 }
