@@ -57,7 +57,7 @@ For a later version, provide `previous_tag` to either Windows workflow to exerci
 
 The PowerShell lifecycle script refuses to install outside the authorized GitHub-hosted Windows workflows unless `-AllowCurrentMachine` is supplied explicitly. Do not use that override as clean-machine evidence.
 
-## Current `0.1.0` local evidence
+## Current `0.1.0` evidence
 
 Recorded on Windows on 2026-08-23:
 
@@ -72,13 +72,21 @@ Recorded on Windows on 2026-08-23:
 | Generated installer metadata | PASS | `Pi GUI`, `0.1.0`, `com.pi.gui`, current-user NSIS, per-machine MSI, fixed upgrade code, and downgrade blocking were present. |
 | MSI extraction and isolated executable launch | PASS, NOT CLEAN-MACHINE | Administrative extraction contained `pi-gui.exe`; it remained alive for eight seconds with isolated app-data environment variables. No installer was run on the development machine. |
 | Windows signatures | BLOCKED | Main EXE, NSIS, and MSI all report `NotSigned`. |
-| Hosted clean-machine lifecycle | READY, NOT RUN | The reviewed history is now on the default `main` branch and the manual workflow is available to run. |
+| Hosted clean-machine lifecycle | PASS | [Run 32648611161](https://github.com/fananly233/pi-gui/actions/runs/32648611161) built `582c662` on a fresh Windows runner. Install, first launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation all passed. Cross-version upgrade was skipped because no earlier Pi GUI release exists. |
 
-Candidate SHA-256 values:
+Local candidate SHA-256 values:
 
 - `pi-gui.exe` (17,406,464 bytes): `F89AB5C969A93378AB6E6E4EB55FF5116C2A5FD12E36A11B3CE297096A9F3B20`
 - `Pi GUI_0.1.0_x64-setup.exe` (4,190,762 bytes): `5B86E6FE43B0F4E232D753DD591DDFE744D3465FF7C67155A0057BDC8385BD56`
 - `Pi GUI_0.1.0_x64_en-US.msi` (6,021,120 bytes): `1E1DD4E5BC57085A6B9DEBDA9614C49F2C7446A3AE0BAB77EABCA779A65AB371`
+
+Hosted evidence:
+
+- source commit: `582c66277fcd487ac7a763a94d09479e88e573f3`;
+- [CI run 32648596237](https://github.com/fananly233/pi-gui/actions/runs/32648596237): PASS;
+- [Windows clean-machine run 32648611161](https://github.com/fananly233/pi-gui/actions/runs/32648611161): PASS;
+- [unsigned Windows artifact 9495743252](https://github.com/fananly233/pi-gui/actions/runs/32648611161/artifacts/9495743252): `pi-gui-windows-unsigned-candidate`, 9,971,669-byte ZIP, retained by GitHub until 2026-11-21;
+- workflow signature observation: `NotSigned`; this run is lifecycle evidence, not permission to publish the artifact.
 
 ## Required local gates
 
@@ -128,16 +136,16 @@ Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive
 
 ## Evidence checklist
 
-- Commit SHA and tag:
-- CI run URL:
-- Windows clean-machine run URL:
-- Signed release-smoke run URL:
-- Windows NSIS/MSI signer and signature status:
-- macOS signing identity and notarization result:
-- Install result:
-- Launch result:
-- Same-version update/reinstall result:
-- Cross-version upgrade result or first-release N/A justification:
-- Uninstall result:
-- App-data preservation result:
-- Known issues:
+- Commit SHA and tag: `582c66277fcd487ac7a763a94d09479e88e573f3`; no release tag yet.
+- CI run URL: [32648596237](https://github.com/fananly233/pi-gui/actions/runs/32648596237), PASS.
+- Windows clean-machine run URL: [32648611161](https://github.com/fananly233/pi-gui/actions/runs/32648611161), PASS.
+- Signed release-smoke run URL: NOT RUN; no signed draft assets exist.
+- Windows NSIS/MSI signer and signature status: no signer; `NotSigned`.
+- macOS signing identity and notarization result: NOT CONFIGURED / NOT RUN.
+- Install result: PASS on a fresh GitHub-hosted Windows runner.
+- Launch result: PASS before and after update/reinstall.
+- Same-version update/reinstall result: PASS for `0.1.0`.
+- Cross-version upgrade result or first-release N/A justification: N/A because there is no earlier Pi GUI release with the same upgrade identity.
+- Uninstall result: PASS; executable, install directory, shortcuts, and uninstall registry key were removed.
+- App-data preservation result: PASS across update/reinstall and default uninstall.
+- Known issues: Windows and macOS signing are not configured; public installer distribution and signed release smoke remain blocked.

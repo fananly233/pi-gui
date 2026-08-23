@@ -105,7 +105,8 @@ Package operations are serialized, capped at 512 KiB of captured output, limited
 
 ## Remaining release work
 
+The first GitHub-hosted Windows lifecycle passed for `582c662`, including install, launch, same-version update/reinstall, uninstall cleanup, and app-data preservation. Cross-version upgrade remains not applicable until an earlier Pi GUI release exists.
+
 - Re-run `npm run check:publish` on every release-facing commit before pushing it to the independent repository.
-- Run the prepared installer lifecycle workflow on a clean hosted Windows runner; no such run has been claimed from the development machine.
 - Configure Windows signing and macOS signing/notarization, then pass the signed cross-platform release-smoke workflow.
 - Run a true cross-version upgrade gate once an earlier Pi GUI release exists; `0.1.0` can only prove the update/reinstall path.

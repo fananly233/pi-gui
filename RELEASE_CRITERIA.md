@@ -58,11 +58,11 @@ Record Pi version, operating system, date, and any intentionally isolated state.
 
 ## 5. Local bundle gate
 
-- [ ] Build expected platform bundles from the locked graph.
-- [ ] Inspect product name, identifier, version, installer scope, upgrade identity, downgrade policy, and bundled files.
-- [ ] Inspect every executable/installer signature.
-- [ ] Record artifact SHA-256 values.
-- [ ] Label extraction or local executable launch as local smoke only.
+- [x] Build the current Windows bundles from the locked graph.
+- [x] Inspect product name, identifier, version, installer scope, upgrade identity, downgrade policy, and bundled files.
+- [x] Inspect every Windows executable/installer signature and retain `NotSigned` as a release blocker.
+- [x] Record local artifact SHA-256 values.
+- [x] Label extraction or local executable launch as local smoke only.
 
 On Windows, NSIS is the primary current-user installer. MSI is machine-scoped. A `NotSigned` result blocks public distribution.
 
@@ -70,13 +70,13 @@ On Windows, NSIS is the primary current-user installer. MSI is machine-scoped. A
 
 Run `.github/workflows/windows-clean-machine.yml` on a fresh hosted Windows runner and record:
 
-- [ ] install;
-- [ ] first launch and process health;
-- [ ] same-version update/reinstall;
-- [ ] cross-version upgrade when a prior Pi GUI release exists;
-- [ ] uninstall;
-- [ ] registry cleanup;
-- [ ] app-data preservation.
+- [x] install;
+- [x] first launch and process health;
+- [x] same-version update/reinstall;
+- [x] cross-version upgrade is not applicable to the first `0.1.0` candidate because no earlier Pi GUI release exists;
+- [x] uninstall;
+- [x] shortcut and registry cleanup;
+- [x] app-data preservation.
 
 Do not use the development machine or an administratively extracted EXE as clean-machine evidence.
 

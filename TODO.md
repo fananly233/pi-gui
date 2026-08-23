@@ -33,13 +33,13 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 ## Blocking before public release
 
 - [x] Harden the real-PTY test to wait for the observed DSR before replying, cover the Windows `cmd.exe` fallback, and prove both paths across six independent test-process runs.
-- [ ] Run **Windows Clean-Machine Candidate** from the independent repository.
-- [ ] Record install, launch, same-version update/reinstall, uninstall, registry cleanup, and app-data preservation evidence.
+- [x] Run **Windows Clean-Machine Candidate** from the independent repository against `582c662`.
+- [x] Record successful install, launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation evidence.
 - [ ] Configure Windows Authenticode signing for NSIS and MSI.
 - [ ] Configure macOS signing and notarization.
 - [ ] Build a draft release from the intended tag.
 - [ ] Run **Signed Release Smoke** against the exact draft assets.
-- [ ] Record commit, tag, workflow URLs, signer identities, hashes, and known limitations in `docs/RELEASES.md`.
+- [x] Record the candidate commit, workflow URLs, unsigned status, local hashes, hosted artifact, and known limitations in `docs/RELEASES.md`.
 - [ ] Publish only after every required release criterion passes.
 
 ## First-release limitation

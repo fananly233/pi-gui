@@ -6,7 +6,7 @@ Pi GUI 是一个面向 [Pi coding agent](https://github.com/earendil-works/pi) �
 
 [![MIT license](https://img.shields.io/badge/license-MIT-6b7280?style=for-the-badge)](./LICENSE)
 
-> 当前状态：`0.1.0` 仍是未发布候选版。源码仓库位于 [fananly233/pi-gui](https://github.com/fananly233/pi-gui)，但现有 Windows 安装包尚未签名，因此目前最可靠的使用方式仍是从源码运行。不要把 Gustav 的历史 Release 当作 Pi GUI 的 Release。
+> 当前状态：`0.1.0` 仍是未发布候选版。源码仓库位于 [fananly233/pi-gui](https://github.com/fananly233/pi-gui)，GitHub-hosted Windows 安装生命周期已经通过，但候选安装包尚未签名，因此目前最可靠的使用方式仍是从源码运行。不要把 Gustav 的历史 Release 当作 Pi GUI 的 Release。
 
 ## 这个项目能做什么
 
