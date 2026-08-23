@@ -14,14 +14,16 @@ Recorded on Windows on 2026-08-23:
 - remote URLs contain no embedded credentials;
 - historical test-key and credential-URL fixtures exist only on the local `archive/electron-mvp` donor branch, not in `HEAD`; that branch must not be pushed to the independent repository;
 - all derivative commits through the current `HEAD` use the connected public GitHub identity and GitHub noreply author/committer email. The explicitly approved rewrite preserved commit count, topology, subjects, dates, and the final source tree while changing the rewritten commit SHAs;
-- PR #1 is merged and the active `main` merge commit preserves the exact reviewed parents and source tree with noreply metadata. GitHub's immutable PR record still identifies its first generated merge object; removing that historical platform record would require GitHub Support;
+- PR #1 is merged and the active `main` merge commit preserves the exact reviewed parents and source tree with noreply metadata. GitHub's immutable PR record still identifies its first generated merge object with obsolete non-noreply author metadata. Removing an eligible historical platform record requires GitHub Support; the maintainer has not yet chosen between requesting removal and explicitly accepting this metadata-only residual;
+- the public GitHub profile currently exposes no public email address;
+- a Phase 9 native-UI fixture under `%TEMP%\pi-gui-phase9-ui-*` still contains local copies of Pi auth/settings/model-store data. The fixture is outside the repository and was never tracked or pushed, but local privacy closure remains incomplete until those known copies are deleted and their absence is verified. App-data quarantine and unrelated native-test directories are not deletion targets;
 - six donor-only issue/development logs remain local but are removed from the Git index and covered by exact ignore rules;
 - only the reviewed Pi GUI history was pushed to `origin/main`; the generated one-file remote root was replaced with an exact lease after its `fananly` MIT copyright line was retained in `LICENSE`, and its original commit remains recoverable from a local bundle;
 - GitHub private vulnerability reporting is enabled and was verified through the dedicated repository API.
 
 `npm run check:publish` now passes across 150 tracked/non-ignored candidate files. It automates the content/history/metadata/remote/attribution checks and redacts suspected values from its output.
 
-The 2026-08-23 GitHub configuration audit found zero repository Actions secrets, zero repository Actions variables, zero Dependabot secrets, and zero Codespaces secrets. Copilot review created one empty `copilot` environment with no protection rules, secrets, or variables; it contains no signing or private configuration. A real Windows signing identity still has to be configured outside Git. Certificate files and the runner-only Windows signing config are ignored by exact release-safety rules.
+The 2026-08-23 GitHub configuration audit found zero repository Actions secrets, zero repository Actions variables, zero Dependabot secrets, and zero Codespaces secrets. Copilot review created one empty `copilot` environment with no protection rules, secrets, or variables; it contains no signing or private configuration. A real Windows signing identity still has to be configured outside Git. Certificate files and the runner-only Windows signing config are ignored by exact release-safety rules. Phase 10B-A did not access or configure signing credential values.
 
 ## Release identity
 
@@ -58,6 +60,8 @@ The npm, Cargo, Linux metainfo, contribution, issue, and security metadata point
 
 Current Windows signing secrets and variables are absent, so the workflow stops before building signed artifacts and the draft job cannot run. Provider selection and setup are documented in [SIGNING.md](./SIGNING.md).
 
+Phase 10B-A records the signing route as `UNDECIDED`. The checked-in workflow implements only an eligible exportable-PFX route. Modern cloud/HSM/EV, issuer-managed, and post-2023 OV certificates require a separately reviewed provider-specific `signCommand`; updater keys are not Authenticode. `npm run check:release` is the credential-free structural preflight and does not claim that signing is configured.
+
 ## Verification levels
 
 These are separate claims and must not be collapsed into “release verified.”
@@ -81,8 +85,18 @@ Phase 10A integrated [PR #1](https://github.com/fananly233/pi-gui/pull/1) into `
 | Mainline CI | PASS | [Run 32664955474](https://github.com/fananly233/pi-gui/actions/runs/32664955474) passed for `3bb7cc4`. |
 | Windows clean-machine lifecycle | PASS | [Run 32665181610](https://github.com/fananly233/pi-gui/actions/runs/32665181610) passed validation, NSIS/MSI build, MSI extraction, install, launch, same-version update/reinstall, uninstall, cleanup, and app-data preservation for `3bb7cc4`. |
 | Native Windows smoke | PASS | The isolated release EXE showed `windows / x86_64` and Desktop `v0.1.0`; theme switching and restart persistence, maximize/restore, application close, and process exit passed without touching the live Pi agent directory. |
-| Publication safety | PASS WITH PLATFORM RESIDUAL | The active mainline history passes `npm run check:publish` with noreply metadata. GitHub retains the first merge object in the immutable PR record as noted above. |
+| Publication safety | BLOCKED ON OPERATOR DECISIONS | The active mainline history passes `npm run check:publish` with noreply metadata, but known local fixture copies still require deletion and verification. GitHub also retains the first merge object in the immutable PR record as noted above. |
 | Release boundary | BLOCKED | The hosted candidate artifact remains unsigned. No tag, draft, Release, or signing credential was created or configured. |
+
+Phase 10B-A added a credential-free release preflight without changing runtime/package inputs. On 2026-08-23, `check:release`, TypeScript, 26 Node tests, frontend build, Cargo check, 25 Rust tests with the managed-runtime download test ignored, full `npm audit`, `check:publish`, and `git diff --check` passed. No real-Pi or clean-machine gate was repeated because this phase changes only release validation and documentation.
+
+The resulting local Windows candidates remain intentionally unsigned:
+
+- `pi-gui.exe` (17,401,856 bytes): `B09863230F553711334C17372B94B74A744D76E66612DA82EF03F3BC8C077299`, `NotSigned`;
+- `Pi GUI_0.1.0_x64-setup.exe` (4,189,230 bytes): `20DBFBC4C5BF565210A4DC25E737F90F947B45C4CCCC6920F03DCF042DE4B07B`, `NotSigned`;
+- `Pi GUI_0.1.0_x64_en-US.msi` (6,017,024 bytes): `CF873E62A84EC5B5CD0522E7EF1ED375619F394225798C1FD8E91D6880601620`, `NotSigned`.
+
+These hashes identify this local build only. They are not release assets, and `NotSigned` remains a hard publication blocker.
 
 Phase 9 source stabilization passed the local deterministic, five real-Pi/runtime, native Tauri, and hosted Windows lifecycle matrix recorded in [RC_ACCEPTANCE.md](./RC_ACCEPTANCE.md). The tested runtime/source commit is `867ac378a0eaab9c55c38daecea81b1491b357d2`; the evidence-only documentation update after that commit does not alter bundled application inputs. No release tag exists.
 
@@ -152,7 +166,7 @@ Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive
 5. Push only the reviewed Pi GUI history without merging or pushing donor-only histories.
 6. Run **Windows Clean-Machine Candidate**. A cross-version upgrade result is required once a prior Pi GUI release exists.
 7. Configure Windows signing according to `docs/SIGNING.md`.
-8. Create the exact version tag. The signed-release workflow creates a draft only after local signature/notarization verification succeeds.
+8. Create the exact version tag. The signed-release workflow creates a draft only after Windows Authenticode verification succeeds.
 9. Run **Signed Windows Release Smoke** against the exact draft assets.
 10. Publish only after all required jobs pass and the release notes include attribution.
 
@@ -181,4 +195,4 @@ No macOS or Linux binary is part of the supported `0.1.0` release. Their source-
 - Cross-version upgrade result or first-release N/A justification: N/A because there is no earlier Pi GUI release with the same upgrade identity.
 - Uninstall result: PASS; executable, install directory, shortcuts, and uninstall registry key were removed.
 - App-data preservation result: PASS across update/reinstall and default uninstall.
-- Known issues: the repository has no Windows signing secrets or variables, so draft creation, public installer distribution, and signed release smoke remain blocked.
+- Known issues: local privacy closure and the GitHub PR metadata-residual decision are pending. The repository also has no selected signing route, Windows signing secrets, or variables, so tag creation, draft creation, public installer distribution, and signed release smoke remain blocked.

@@ -45,7 +45,11 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Merge PR #1 with a two-parent merge commit, verify its tree matches the reviewed head, and keep the RC branch available.
 - [x] Keep the active `main` merge metadata on the GitHub noreply identity and pass `npm run check:publish` after integration.
 - [x] Pass mainline CI and **Windows Clean-Machine Candidate** for `3bb7cc411467fece7d5dbe5edf083d78a836a456`.
-- [ ] Configure Windows Authenticode signing for NSIS and MSI.
+- [x] Audit the Windows signing routes and add a credential-free preflight for the checked-in PFX gate, verification order, and Windows-only artifact scope.
+- [ ] Delete and verify absence of the known local `%TEMP%\pi-gui-phase9-ui-*` Pi configuration copies; leave the app-data quarantine and unrelated native-test directories untouched.
+- [ ] Explicitly accept PR #1's obsolete metadata-only merge object or authorize an eligible GitHub Support cleanup request.
+- [ ] Select the Windows signing route: eligible exportable PFX, or a separately reviewed provider-specific `signCommand` implementation.
+- [ ] Configure Windows Authenticode signing for NSIS and MSI only after the route is selected.
 - [ ] Build a draft release from the intended tag.
 - [ ] Run **Signed Windows Release Smoke** against the exact draft assets.
 - [x] Record the candidate commit, workflow URLs, unsigned status, local hashes, hosted artifact, and known limitations in `docs/RELEASES.md`.

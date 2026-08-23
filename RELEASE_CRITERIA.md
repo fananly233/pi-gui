@@ -15,7 +15,7 @@ The current local RC stabilization record is maintained in [docs/RC_ACCEPTANCE.m
 - [x] The public repository URL and private security-reporting route are configured.
 - [x] Branding/icon naming is reviewed for the Pi GUI identity.
 
-## 2. Pre-push privacy gate
+## 2. Repository and operator privacy gate
 
 - [x] Repository-local Git name is an approved public identity.
 - [x] Every post-fork author and committer email uses an approved GitHub noreply address.
@@ -24,6 +24,8 @@ The current local RC stabilization record is maintained in [docs/RC_ACCEPTANCE.m
 - [x] No `.env`, Pi auth/session data, local app data, signing material, logs, personal paths, or local orchestration notes are tracked.
 - [x] Remote URLs contain no embedded credentials.
 - [x] Only the reviewed Pi GUI history was pushed. Never use `git push --all` or `git push --mirror`; `archive/electron-mvp` is a local donor-work archive.
+- [ ] Delete the known `%TEMP%\pi-gui-phase9-ui-*` copies of Pi auth/settings/model-store data and verify that the copied files are absent. Do not delete the app-data quarantine or unrelated native-test directories as part of this item.
+- [ ] Record the maintainer's decision for PR #1's obsolete metadata-only merge object: request eligible cleanup from GitHub Support, or explicitly accept the residual. The active mainline and public profile already use privacy-safe metadata.
 
 Changing existing commit author/committer metadata rewrites commit hashes. It requires explicit approval and must happen before the first public push.
 
@@ -86,6 +88,8 @@ Do not use the development machine or an administratively extracted EXE as clean
 
 ## 7. Signed release gate
 
+- [x] The credential-free preflight proves the Windows-only workflow gate/order and keeps signing fields out of the checked-in Tauri config.
+- [ ] The maintainer has selected either an eligible exportable-PFX route or a separately implemented provider-specific `signCommand` route.
 - [ ] Windows NSIS and MSI have valid Authenticode signatures.
 - [x] macOS and Linux binary assets are explicitly out of scope for `0.1.0`; no unsupported artifacts are attached to its draft.
 - [x] `.github/workflows/release.yml` creates or updates a draft only after both declared Windows artifacts pass release verification.
