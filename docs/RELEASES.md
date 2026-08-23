@@ -2,7 +2,7 @@
 
 ## Current state
 
-`0.1.0` is an unpublished release candidate. The independent repository is [fananly233/pi-gui](https://github.com/fananly233/pi-gui), and the locally generated Windows installers are not signed. No release tag or Pi GUI draft exists. The Gustav project’s releases are upstream history, not Pi GUI releases.
+`0.1.0` is an unpublished Windows-only binary release candidate. The independent repository is [fananly233/pi-gui](https://github.com/fananly233/pi-gui), and the locally generated Windows installers are not signed. macOS and Linux remain source-build targets without supported `0.1.0` release assets. No release tag or Pi GUI draft exists. The Gustav project’s releases are upstream history, not Pi GUI releases.
 
 ## Repository publication and privacy status
 
@@ -20,7 +20,7 @@ Recorded on Windows on 2026-08-23:
 
 `npm run check:publish` now passes across 150 tracked/non-ignored candidate files. It automates the content/history/metadata/remote/attribution checks and redacts suspected values from its output.
 
-The 2026-08-23 GitHub configuration audit found zero repository Actions secrets, zero repository Actions variables, zero Dependabot secrets, and zero Codespaces secrets. Copilot review created one empty `copilot` environment with no protection rules, secrets, or variables; it contains no signing or private configuration. Real Windows and Apple identities still have to be configured outside Git. Certificate files and the runner-only Windows signing config are ignored by exact release-safety rules.
+The 2026-08-23 GitHub configuration audit found zero repository Actions secrets, zero repository Actions variables, zero Dependabot secrets, and zero Codespaces secrets. Copilot review created one empty `copilot` environment with no protection rules, secrets, or variables; it contains no signing or private configuration. A real Windows signing identity still has to be configured outside Git. Certificate files and the runner-only Windows signing config are ignored by exact release-safety rules.
 
 ## Release identity
 
@@ -49,14 +49,13 @@ The npm, Cargo, Linux metainfo, contribution, issue, and security metadata point
 
 ## Signed-release workflow
 
-`.github/workflows/release.yml` no longer lets `tauri-action` create a draft while artifacts are still unverified. It now checks out an existing exact tag, builds into runner-local staging, verifies each platform, and creates or updates a draft only after the complete matrix succeeds.
+`.github/workflows/release.yml` no longer lets `tauri-action` create a draft while artifacts are still unverified. For the Windows-only `0.1.0` scope, it checks out an existing exact tag, builds into runner-local staging, and creates or updates a draft only after the signed Windows application, NSIS installer, and MSI pass verification.
 
 - Windows supports an eligible exportable PFX path and verifies the app executable, NSIS installer, and MSI against an exact signer subject and trusted timestamp.
-- macOS requires a Developer ID certificate plus notarization credentials and verifies `codesign`, Gatekeeper, and stapled notarization tickets.
-- Linux verifies AppImage and DEB package contents.
-- The final job requires exactly one artifact of every declared type before uploading anything to a draft.
+- The final job requires exactly one NSIS installer and one MSI before uploading anything to a draft.
+- macOS and Linux artifacts are not built or accepted by the `0.1.0` release workflow.
 
-Current secrets are absent, so Windows and macOS stop before building signed artifacts and the draft job cannot run. Provider selection and setup are documented in [SIGNING.md](./SIGNING.md).
+Current Windows signing secrets and variables are absent, so the workflow stops before building signed artifacts and the draft job cannot run. Provider selection and setup are documented in [SIGNING.md](./SIGNING.md).
 
 ## Verification levels
 
@@ -64,7 +63,7 @@ These are separate claims and must not be collapsed into “release verified.”
 
 1. Local build verification checks source, tests, metadata, bundle contents, and signatures. It is not clean-machine evidence.
 2. `.github/workflows/windows-clean-machine.yml` starts on a fresh GitHub-hosted Windows runner, builds the unsigned candidate there, and performs install, launch, update/reinstall, uninstall, registry cleanup, and app-data preservation checks.
-3. `.github/workflows/release-smoke.yml` downloads release assets on fresh hosted runners. Windows assets must match the configured signer and include trusted timestamps; macOS bundles must pass code-signature, Gatekeeper, and stapler assessment; Linux package contents are checked.
+3. `.github/workflows/release-smoke.yml` downloads the two Windows release assets on a fresh hosted runner. Both must match the configured signer and include trusted timestamps before the NSIS lifecycle test runs.
 
 For a later version, provide `previous_tag` to either Windows workflow to exercise a true cross-version NSIS upgrade. For the first `0.1.0` release, the lifecycle gate can only verify the installer’s update/reinstall path because no earlier Pi GUI identity exists.
 
@@ -141,16 +140,16 @@ Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive
 4. Confirm the independent repository URL, derivative-work declaration, and private vulnerability-reporting setting.
 5. Push only the reviewed Pi GUI history without merging or pushing donor-only histories.
 6. Run **Windows Clean-Machine Candidate**. A cross-version upgrade result is required once a prior Pi GUI release exists.
-7. Configure Windows signing and macOS signing/notarization according to `docs/SIGNING.md`.
+7. Configure Windows signing according to `docs/SIGNING.md`.
 8. Create the exact version tag. The signed-release workflow creates a draft only after local signature/notarization verification succeeds.
-9. Run **Signed Release Smoke** against the exact draft assets.
+9. Run **Signed Windows Release Smoke** against the exact draft assets.
 10. Publish only after all required jobs pass and the release notes include attribution.
 
-## Expected artifacts
+## Expected `0.1.0` artifacts
 
-- macOS: `.dmg` and `.app.tar.gz`
 - Windows: NSIS `setup.exe` and `.msi`
-- Linux: `.AppImage` and `.deb`
+
+No macOS or Linux binary is part of the supported `0.1.0` release. Their source-build metadata remains in the repository for future work.
 
 ## Evidence checklist
 
@@ -161,11 +160,11 @@ Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive
 - Previous Windows clean-machine run URL: [32650837760](https://github.com/fananly233/pi-gui/actions/runs/32650837760), PASS.
 - Signed release-smoke run URL: NOT RUN; no signed draft assets exist.
 - Windows NSIS/MSI signer and signature status: no signer; `NotSigned`.
-- macOS signing identity and notarization result: NOT CONFIGURED / NOT RUN.
+- macOS and Linux release assets: NOT APPLICABLE to the Windows-only `0.1.0` scope.
 - Install result: PASS on a fresh GitHub-hosted Windows runner.
 - Launch result: PASS before and after update/reinstall.
 - Same-version update/reinstall result: PASS for `0.1.0`.
 - Cross-version upgrade result or first-release N/A justification: N/A because there is no earlier Pi GUI release with the same upgrade identity.
 - Uninstall result: PASS; executable, install directory, shortcuts, and uninstall registry key were removed.
 - App-data preservation result: PASS across update/reinstall and default uninstall.
-- Known issues: the repository has no signing secrets or variables; Windows provider credentials and Apple Developer credentials are not configured, so draft creation, public installer distribution, and signed release smoke remain blocked.
+- Known issues: the repository has no Windows signing secrets or variables, so draft creation, public installer distribution, and signed release smoke remain blocked.

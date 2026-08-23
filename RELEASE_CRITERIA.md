@@ -2,7 +2,7 @@
 
 Last updated: 2026-08-23.
 
-Pi GUI `0.1.0` is an unpublished derivative release candidate. A local build or unsigned installer is not a public release.
+Pi GUI `0.1.0` is an unpublished Windows-only binary release candidate. macOS and Linux remain source-build targets but do not have supported `0.1.0` release assets. A local build or unsigned installer is not a public release.
 
 The current local RC stabilization record is maintained in [docs/RC_ACCEPTANCE.md](./docs/RC_ACCEPTANCE.md). It does not replace signed-release or clean-machine evidence.
 
@@ -87,10 +87,9 @@ Do not use the development machine or an administratively extracted EXE as clean
 ## 7. Signed release gate
 
 - [ ] Windows NSIS and MSI have valid Authenticode signatures.
-- [ ] macOS app and DMG are signed and notarized.
-- [ ] Linux package contents and metadata pass smoke checks.
-- [x] `.github/workflows/release.yml` creates or updates a draft only after every declared platform artifact passes its release verification.
-- [ ] `.github/workflows/release-smoke.yml` passes against the exact draft assets.
+- [x] macOS and Linux binary assets are explicitly out of scope for `0.1.0`; no unsupported artifacts are attached to its draft.
+- [x] `.github/workflows/release.yml` creates or updates a draft only after both declared Windows artifacts pass release verification.
+- [ ] `.github/workflows/release-smoke.yml` passes against the exact signed Windows draft assets.
 - [ ] Release notes include lineage, known limitations, install network requirements, and verification links.
 
 ## 8. Publish decision

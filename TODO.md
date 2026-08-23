@@ -41,10 +41,10 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Re-run **Windows Clean-Machine Candidate** from the independent repository against signed-release hardening commit `03d064b`.
 - [x] Record successful install, launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation evidence.
 - [x] Re-run CI and **Windows Clean-Machine Candidate** for Phase 9 runtime/source commit `867ac37`; both passed on fresh GitHub-hosted runners.
+- [x] Lock `0.1.0` to signed Windows NSIS/MSI release assets; macOS and Linux remain unsupported source-build targets for this version.
 - [ ] Configure Windows Authenticode signing for NSIS and MSI.
-- [ ] Configure macOS signing and notarization.
 - [ ] Build a draft release from the intended tag.
-- [ ] Run **Signed Release Smoke** against the exact draft assets.
+- [ ] Run **Signed Windows Release Smoke** against the exact draft assets.
 - [x] Record the candidate commit, workflow URLs, unsigned status, local hashes, hosted artifact, and known limitations in `docs/RELEASES.md`.
 - [ ] Publish only after every required release criterion passes.
 

@@ -99,7 +99,7 @@ This is unsigned lifecycle evidence, not permission to publish the installers. N
 
 ## Remaining release gates
 
-- Configure trusted Windows and Apple signing identities outside Git.
-- Produce signed draft assets from the exact intended tag and pass cross-platform signed release smoke.
+- Configure a trusted Windows signing identity outside Git.
+- Produce signed Windows draft assets from the exact intended tag and pass Signed Windows Release Smoke.
 - Keep cross-version Windows upgrade marked N/A only for `0.1.0`; it becomes mandatory once an earlier Pi GUI release exists.
 - Do not create or publish a tag/Release until the maintainer explicitly starts that separate release step.

@@ -19,6 +19,7 @@ const metainfo = fs.readFileSync("src-tauri/linux/com.pi.gui.metainfo.xml", "utf
 const iconSourcePath = "assets/branding/pi-gui-icon.svg";
 const inheritedIconSourcePath = "assets/branding/pi-desktop-icon.svg";
 const releaseWorkflow = fs.readFileSync(".github/workflows/release.yml", "utf8");
+const releaseSmokeWorkflow = fs.readFileSync(".github/workflows/release-smoke.yml", "utf8");
 const repositoryUrl = "https://github.com/fananly233/pi-gui";
 
 requireMatch(packageJson.name, "pi-gui", "npm package name");
@@ -89,16 +90,22 @@ if (!iconSource.includes("GUI wordmark") || iconSource.includes("DESK wordmark")
 }
 
 const windowsVerification = releaseWorkflow.indexOf("Verify and stage Windows signatures");
-const macosVerification = releaseWorkflow.indexOf("Verify and stage macOS signing and notarization");
 const draftCreation = releaseWorkflow.indexOf("Create or update draft");
-if (
-	windowsVerification < 0 ||
-	macosVerification < 0 ||
-	draftCreation < 0 ||
-	windowsVerification > draftCreation ||
-	macosVerification > draftCreation
-) {
-	throw new Error("signed-release workflow must verify Windows and macOS before draft creation");
+if (windowsVerification < 0 || draftCreation < 0 || windowsVerification > draftCreation) {
+	throw new Error("signed-release workflow must verify Windows before draft creation");
+}
+for (const marker of ["Verify and stage macOS", "Verify and stage Linux", "pi-gui-release-macos", "pi-gui-release-linux"]) {
+	if (releaseWorkflow.includes(marker)) {
+		throw new Error(`Windows-only 0.1.0 release workflow contains unsupported marker: ${marker}`);
+	}
+}
+for (const marker of ["smoke-macos:", "smoke-linux:"]) {
+	if (releaseSmokeWorkflow.includes(marker)) {
+		throw new Error(`Windows-only 0.1.0 smoke workflow contains unsupported job: ${marker}`);
+	}
+}
+if (!releaseSmokeWorkflow.includes("smoke-windows:")) {
+	throw new Error("Windows-only 0.1.0 smoke workflow is missing smoke-windows");
 }
 
 const releaseTag = process.env.RELEASE_TAG?.trim();

@@ -1,8 +1,8 @@
 # Release signing
 
-Pi GUI does not publish unsigned desktop installers as Releases. The signed-release workflow builds into runner-local staging, verifies every platform, and only then creates or updates a GitHub draft. A missing credential, unexpected signer, absent timestamp, failed notarization, or incomplete artifact set stops before the draft step.
+Pi GUI does not publish unsigned desktop installers as Releases. The `0.1.0` signed-release workflow is Windows-only: it builds into runner-local staging, verifies the application, NSIS installer, and MSI, and only then creates or updates a GitHub draft. A missing credential, unexpected signer, absent timestamp, or incomplete artifact set stops before the draft step.
 
-As audited on 2026-08-23, `fananly233/pi-gui` has no repository Actions secrets, variables, or environments configured. The workflow is therefore intentionally blocked until the maintainer supplies real signing identities. Never use a self-signed certificate to turn these gates green.
+As audited on 2026-08-23, `fananly233/pi-gui` has no repository Actions secrets or variables. The only environment is an empty `copilot` environment with no protection rules, secrets, or variables. The workflow is therefore intentionally blocked until the maintainer supplies a real Windows signing identity. Never use a self-signed certificate to turn these gates green.
 
 ## Windows
 
@@ -31,28 +31,15 @@ Copy the file contents into the GitHub secret, then securely remove the local te
 
 Tauri warns that its documented exportable-PFX OV path applies only to OV certificates acquired before 2023-06-01. For a modern hardware-backed, cloud/HSM, EV, or issuer-managed certificate, leave `WINDOWS_SIGNING_MODE` unset and implement that provider's command through Tauri `bundle.windows.signCommand`; do not force the certificate into this PFX path. See [Tauri Windows code signing](https://v2.tauri.app/distribute/sign/windows/).
 
-## macOS
-
-The workflow currently supports Developer ID distribution outside the Mac App Store using Apple ID notarization. Configure these repository secrets:
-
-- `APPLE_CERTIFICATE`: base64-encoded Developer ID Application `.p12`.
-- `APPLE_CERTIFICATE_PASSWORD`: the `.p12` export password.
-- `APPLE_ID`: the Apple Developer account email used for notarization.
-- `APPLE_PASSWORD`: an app-specific password, not the normal Apple account password.
-- `APPLE_TEAM_ID`: the Apple Developer team ID.
-
-The workflow relies on Tauri to infer the signing identity from `APPLE_CERTIFICATE`. Explicit identity selection and App Store Connect API-key notarization are not wired into this workflow; either change requires a reviewed workflow update. See [Tauri macOS code signing](https://v2.tauri.app/distribute/sign/macos/).
-
 ## Enforced verification
 
 Before any draft exists, the release workflow requires:
 
 - the checked-out commit to match an existing version tag exactly;
 - Windows application, NSIS, and MSI signatures to be `Valid`, use the expected signer subject, and contain a trusted timestamp;
-- macOS `codesign`, Gatekeeper, and stapler validation to pass for the app and DMG;
-- Linux AppImage and DEB contents to contain the expected binary and metainfo;
-- exactly one expected artifact of each release type.
+- exactly one NSIS installer and one MSI to be staged for the draft;
+- no macOS or Linux artifact to be treated as a supported `0.1.0` release asset.
 
-After the draft is created, run **Signed Release Smoke** against the same tag. That workflow downloads the draft assets on fresh hosted runners and independently repeats signature, notarization, package-content, and Windows lifecycle checks. Publishing remains a manual action after the smoke workflow passes.
+After the draft is created, run **Signed Windows Release Smoke** against the same tag. That workflow downloads the draft assets on a fresh hosted runner and independently repeats signature, MSI-payload, and Windows lifecycle checks. Publishing remains a manual action after the smoke workflow passes.
 
-Tauri updater keys (`TAURI_SIGNING_PRIVATE_KEY`) are a different mechanism from Windows Authenticode and Apple code signing. Pi GUI does not currently ship the updater plugin, so updater keys must not be presented as platform-signing completion.
+Tauri updater keys (`TAURI_SIGNING_PRIVATE_KEY`) are a different mechanism from Windows Authenticode. Pi GUI does not currently ship the updater plugin, so updater keys must not be presented as platform-signing completion.

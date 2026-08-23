@@ -180,7 +180,7 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Native confirmation regression | PASS | Cancelling both worktree switch and clean removal preserved the active session/workspace and left the worktree registered and present on disk. All affected renderer callers now await a fail-closed Tauri-native dialog. |
 | Native data isolation | PASS | `PI_GUI_DATA_DIR` and the Windows WebView2 profile were redirected to disposable roots. Diagnostics showed only the isolated runtime path; normal runtime and Pi config hashes/timestamps remained unchanged; no test-root process survived shutdown. |
 | Hosted lifecycle for Phase 9 code tip | PASS | [CI 32658150459](https://github.com/fananly233/pi-gui/actions/runs/32658150459) and [Windows Clean-Machine Candidate 32658152422](https://github.com/fananly233/pi-gui/actions/runs/32658152422) passed for `867ac378a0eaab9c55c38daecea81b1491b357d2`. The fresh runner passed MSI extraction plus NSIS install, launch, same-version update/reinstall, uninstall, cleanup, and app-data preservation. |
-| Signing and public release | BLOCKED | Windows artifacts remain unsigned; Apple identities are not configured; no tag, draft, or Release was created. |
+| Signing and public release | BLOCKED | Windows artifacts remain unsigned; macOS/Linux binaries are out of scope for the Windows-only `0.1.0`; no tag, draft, or Release was created. |
 
 ## Migration decisions
 
