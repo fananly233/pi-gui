@@ -30,7 +30,7 @@ The Phase 9 code tip passed on Windows x86_64:
 | `cargo check --locked` | PASS. |
 | `cargo test --locked --lib` | PASS; 25 passed and the explicit network/download runtime test remained ignored. |
 | `npm audit` | PASS; zero findings. |
-| `npm run check:publish` | PASS across 150 tracked/non-ignored candidate files; rerun is required after the final documentation commit. |
+| `npm run check:publish` | PASS across 150 tracked/non-ignored candidate files, including the final evidence update. |
 
 The only retained Rust build warning is the localized MSVC linker message emitted while creating the import library; it is not a test failure.
 
@@ -47,6 +47,8 @@ All five gates passed with Pi `0.84.2`:
 | `gate:runtime-real` | PASS | Temporary managed-runtime root; system Pi and normal app data untouched. |
 
 The real Pi auth and settings file hashes were captured before the gates and matched afterwards. No credential values or hashes are stored in this document.
+
+The first RPC rerun exposed a real cold-start condition: Pi installed a configured package before it consumed RPC input, which exceeded the old 35-second gate timeout. The RPC, session, and model gates now use the same five-minute startup-readiness budget as the desktop, while ordinary post-start RPC requests retain their 35-second timeout. A second cold run completed and all five gates passed.
 
 ## Native Tauri acceptance
 
@@ -69,8 +71,9 @@ A real `npm run tauri dev` build was exercised through the native Windows applic
 
 - All affected file, worktree, package, trust, and workspace-switch flows now await Tauri's native confirmation plugin. Dialog failure cancels the action.
 - Pi startup does not report ready until a correlated `get_state` response arrives. Startup failure stops the spawned RPC instance and rejects pending requests.
+- Concurrent Pi startup, Git worktree, and package mutations are locked before any awaited listener or native confirmation, preventing duplicate starts or reentry while a dialog is open.
 - Models/auth refreshes when the same runtime transitions from loading to ready.
-- Rust app data can be redirected for native tests through an absolute, non-root `PI_GUI_DATA_DIR`.
+- Rust app data can be redirected for native tests through an absolute, non-root `PI_GUI_DATA_DIR` that rejects parent-directory components.
 
 For a disposable native run, use unique paths and keep them outside the repository:
 
@@ -86,9 +89,16 @@ Populate the disposable `PI_CODING_AGENT_DIR` with only the Pi configuration req
 
 During the final isolated rerun, runtime diagnostics pointed only to the disposable app-data root. The pre-existing normal runtime log and real Pi auth/settings files retained identical size, timestamp, and SHA-256 values. The isolated lifecycle log contained only `desktop_started`, `rpc_started`, `rpc_exited`, and `desktop_stopped` events.
 
+## Hosted clean-machine evidence
+
+The tested runtime/source commit is `867ac378a0eaab9c55c38daecea81b1491b357d2`. [CI run 32658150459](https://github.com/fananly233/pi-gui/actions/runs/32658150459) and [Windows clean-machine run 32658152422](https://github.com/fananly233/pi-gui/actions/runs/32658152422) both passed for that exact commit.
+
+The clean-machine job passed dependency install, candidate validation, Windows bundle build, MSI administrative extraction, NSIS install, first launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation. Cross-version upgrade was skipped because no earlier Pi GUI release exists. Artifact [9498181296](https://github.com/fananly233/pi-gui/actions/runs/32658152422/artifacts/9498181296), `pi-gui-windows-unsigned-candidate`, is a 9,954,766-byte ZIP with digest `sha256:74f3c4ca878b6302f74f633c04d25dea4114291ba5a76347b5f25b7fb782104d`, retained until 2026-11-21T18:28:35Z.
+
+This is unsigned lifecycle evidence, not permission to publish the installers. No tag or GitHub Release was created.
+
 ## Remaining release gates
 
-- Push only the reviewed stabilization branch, then pass CI and rerun the hosted Windows clean-machine lifecycle for the final candidate.
 - Configure trusted Windows and Apple signing identities outside Git.
 - Produce signed draft assets from the exact intended tag and pass cross-platform signed release smoke.
 - Keep cross-version Windows upgrade marked N/A only for `0.1.0`; it becomes mandatory once an earlier Pi GUI release exists.

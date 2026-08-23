@@ -40,7 +40,7 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Harden the real-PTY test to wait for the observed DSR before replying, cover the Windows `cmd.exe` fallback, and prove both paths across six independent test-process runs.
 - [x] Re-run **Windows Clean-Machine Candidate** from the independent repository against signed-release hardening commit `03d064b`.
 - [x] Record successful install, launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation evidence.
-- [ ] Re-run CI and **Windows Clean-Machine Candidate** for the final Phase 9 stabilization commit.
+- [x] Re-run CI and **Windows Clean-Machine Candidate** for Phase 9 runtime/source commit `867ac37`; both passed on fresh GitHub-hosted runners.
 - [ ] Configure Windows Authenticode signing for NSIS and MSI.
 - [ ] Configure macOS signing and notarization.
 - [ ] Build a draft release from the intended tag.
