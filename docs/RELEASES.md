@@ -14,6 +14,7 @@ Recorded on Windows on 2026-08-23:
 - remote URLs contain no embedded credentials;
 - historical test-key and credential-URL fixtures exist only on the local `archive/electron-mvp` donor branch, not in `HEAD`; that branch must not be pushed to the independent repository;
 - all derivative commits through the current `HEAD` use the connected public GitHub identity and GitHub noreply author/committer email. The explicitly approved rewrite preserved commit count, topology, subjects, dates, and the final source tree while changing the rewritten commit SHAs;
+- PR #1 is merged and the active `main` merge commit preserves the exact reviewed parents and source tree with noreply metadata. GitHub's immutable PR record still identifies its first generated merge object; removing that historical platform record would require GitHub Support;
 - six donor-only issue/development logs remain local but are removed from the Git index and covered by exact ignore rules;
 - only the reviewed Pi GUI history was pushed to `origin/main`; the generated one-file remote root was replaced with an exact lease after its `fananly` MIT copyright line was retained in `LICENSE`, and its original commit remains recoverable from a local bundle;
 - GitHub private vulnerability reporting is enabled and was verified through the dedicated repository API.
@@ -72,6 +73,16 @@ The PowerShell lifecycle script refuses to install outside the authorized GitHub
 ## Current `0.1.0` evidence
 
 Recorded on Windows on 2026-08-23:
+
+Phase 10A integrated [PR #1](https://github.com/fananly233/pi-gui/pull/1) into `main` as a two-parent merge commit. The active merge commit is `3bb7cc411467fece7d5dbe5edf083d78a836a456`; its parents are the reviewed base `4147e6a48142a63ad701dec0d13b7a659ca3b2b9` and PR head `ef758c0ab7e24724de50db71cba8655918770577`, and its tree is identical to that PR head.
+
+| Phase 10A check | Result | Evidence |
+| --- | --- | --- |
+| Mainline CI | PASS | [Run 32664955474](https://github.com/fananly233/pi-gui/actions/runs/32664955474) passed for `3bb7cc4`. |
+| Windows clean-machine lifecycle | PASS | [Run 32665181610](https://github.com/fananly233/pi-gui/actions/runs/32665181610) passed validation, NSIS/MSI build, MSI extraction, install, launch, same-version update/reinstall, uninstall, cleanup, and app-data preservation for `3bb7cc4`. |
+| Native Windows smoke | PASS | The isolated release EXE showed `windows / x86_64` and Desktop `v0.1.0`; theme switching and restart persistence, maximize/restore, application close, and process exit passed without touching the live Pi agent directory. |
+| Publication safety | PASS WITH PLATFORM RESIDUAL | The active mainline history passes `npm run check:publish` with noreply metadata. GitHub retains the first merge object in the immutable PR record as noted above. |
+| Release boundary | BLOCKED | The hosted candidate artifact remains unsigned. No tag, draft, Release, or signing credential was created or configured. |
 
 Phase 9 source stabilization passed the local deterministic, five real-Pi/runtime, native Tauri, and hosted Windows lifecycle matrix recorded in [RC_ACCEPTANCE.md](./RC_ACCEPTANCE.md). The tested runtime/source commit is `867ac378a0eaab9c55c38daecea81b1491b357d2`; the evidence-only documentation update after that commit does not alter bundled application inputs. No release tag exists.
 
@@ -153,6 +164,9 @@ No macOS or Linux binary is part of the supported `0.1.0` release. Their source-
 
 ## Evidence checklist
 
+- Phase 10A active mainline merge commit: `3bb7cc411467fece7d5dbe5edf083d78a836a456`; reviewed source tree matches PR head `ef758c0ab7e24724de50db71cba8655918770577`.
+- Phase 10A mainline CI and Windows clean-machine runs: [32664955474](https://github.com/fananly233/pi-gui/actions/runs/32664955474) and [32665181610](https://github.com/fananly233/pi-gui/actions/runs/32665181610), both PASS.
+- Phase 10A unsigned Windows artifact: [9499997749](https://github.com/fananly233/pi-gui/actions/runs/32665181610/artifacts/9499997749), `pi-gui-windows-unsigned-candidate`, 9,956,736-byte ZIP, digest `sha256:3fa655fa6f51ae00b24f23c2b46648f64c337e46415eabef8babd64bfda29d31`, retained until 2026-11-21T20:41:23Z.
 - Phase 9 tested runtime/source commit: `867ac378a0eaab9c55c38daecea81b1491b357d2`; no release tag exists.
 - Phase 9 CI and Windows clean-machine runs: [32658150459](https://github.com/fananly233/pi-gui/actions/runs/32658150459) and [32658152422](https://github.com/fananly233/pi-gui/actions/runs/32658152422), both PASS.
 - Previous hosted baseline commit: `03d064bf1931b7df003dac4f519a392d0d68a185`.

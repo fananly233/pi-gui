@@ -10,7 +10,7 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Keep Gustav MIT and DLYZZT Apache-2.0 attribution and modification notices.
 - [x] Build local Windows NSIS/MSI candidates and record exact local-only evidence.
 - [x] Add Windows clean-machine candidate and signed release-smoke workflows.
-- [x] Make the signed-release workflow verify all platform artifacts before it can create a draft.
+- [x] Make the signed-release workflow verify both supported Windows artifacts before it can create a draft.
 - [x] Refresh README, contribution, security, roadmap, package/theme, and release documentation to match the React/Tauri implementation.
 - [x] Add ignore rules and a repeatable `npm run check:publish` privacy gate.
 - [x] Keep six donor-only issue/development logs as ignored local files and remove them from the public Git index.
@@ -42,6 +42,9 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Record successful install, launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation evidence.
 - [x] Re-run CI and **Windows Clean-Machine Candidate** for Phase 9 runtime/source commit `867ac37`; both passed on fresh GitHub-hosted runners.
 - [x] Lock `0.1.0` to signed Windows NSIS/MSI release assets; macOS and Linux remain unsupported source-build targets for this version.
+- [x] Merge PR #1 with a two-parent merge commit, verify its tree matches the reviewed head, and keep the RC branch available.
+- [x] Keep the active `main` merge metadata on the GitHub noreply identity and pass `npm run check:publish` after integration.
+- [x] Pass mainline CI and **Windows Clean-Machine Candidate** for `3bb7cc411467fece7d5dbe5edf083d78a836a456`.
 - [ ] Configure Windows Authenticode signing for NSIS and MSI.
 - [ ] Build a draft release from the intended tag.
 - [ ] Run **Signed Windows Release Smoke** against the exact draft assets.

@@ -18,11 +18,11 @@ Phases 1–8 are implemented:
 - Pi package operations and runtime resource discovery;
 - verified, versioned, app-owned Pi runtime with rollback and system-Pi fallback.
 
-The independent repository, public metadata, attribution, derivative commit-identity cleanup, first hosted Windows install lifecycle, and local Phase 9 RC stabilization are complete. The remaining `0.1.0` work is release engineering, not feature expansion:
+The independent repository, public metadata, attribution, derivative commit-identity cleanup, Phase 9 RC stabilization, Phase 10A mainline integration, and final unsigned Windows install lifecycle are complete. The remaining `0.1.0` work is release engineering, not feature expansion:
 
-1. rerun CI and the hosted Windows lifecycle for the final stabilized candidate;
-2. configure Windows signing and macOS signing/notarization;
-3. pass signed release smoke and publish the first Pi GUI release.
+1. configure trusted Windows Authenticode signing for NSIS and MSI;
+2. build a signed draft from the exact intended tag and pass Signed Windows Release Smoke;
+3. publish the first Pi GUI release only after those gates pass.
 
 ## After 0.1
 

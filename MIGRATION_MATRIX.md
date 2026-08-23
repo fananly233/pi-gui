@@ -182,6 +182,15 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Hosted lifecycle for Phase 9 code tip | PASS | [CI 32658150459](https://github.com/fananly233/pi-gui/actions/runs/32658150459) and [Windows Clean-Machine Candidate 32658152422](https://github.com/fananly233/pi-gui/actions/runs/32658152422) passed for `867ac378a0eaab9c55c38daecea81b1491b357d2`. The fresh runner passed MSI extraction plus NSIS install, launch, same-version update/reinstall, uninstall, cleanup, and app-data preservation. |
 | Signing and public release | BLOCKED | Windows artifacts remain unsigned; macOS/Linux binaries are out of scope for the Windows-only `0.1.0`; no tag, draft, or Release was created. |
 
+## Phase 10A mainline verification (2026-08-23, Windows-only `0.1.0`)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| PR #1 integration | PASS | The active two-parent merge `3bb7cc411467fece7d5dbe5edf083d78a836a456` has base `4147e6a48142a63ad701dec0d13b7a659ca3b2b9`, reviewed head `ef758c0ab7e24724de50db71cba8655918770577`, and the exact reviewed source tree. The RC branch was retained. |
+| Mainline deterministic and native gates | PASS | TypeScript, 26 renderer/domain tests, frontend build, Cargo format/check, 25 Rust tests, npm audit, release metadata, publish safety, all five real-Pi/runtime gates, and isolated native startup/window/theme/close checks passed. |
+| Mainline hosted lifecycle | PASS | [CI 32664955474](https://github.com/fananly233/pi-gui/actions/runs/32664955474) and [Windows Clean-Machine Candidate 32665181610](https://github.com/fananly233/pi-gui/actions/runs/32665181610) passed for `3bb7cc411467fece7d5dbe5edf083d78a836a456`. |
+| Release boundary | BLOCKED | The hosted candidate is still unsigned. No signing credential, tag, draft, or Release was created; Signed Windows Release Smoke remains pending. |
+
 ## Migration decisions
 
 | Feature | DLYZZT source | Gustav source | Strategy | Priority | Risk | Verification |
