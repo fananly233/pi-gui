@@ -48,8 +48,20 @@ jobs:
       - name: TypeScript check
         run: npm run check
 
+      - name: Renderer tests
+        run: npm test
+
+      - name: Release metadata check
+        run: npm run check:release
+
       - name: Frontend build
         run: npm run build:frontend
 
       - name: Rust check
-        run: cargo check --manifest-path src-tauri/Cargo.toml
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml
+
+      - name: Rust tests
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
+
+      - name: Dependency audit
+        run: npm audit

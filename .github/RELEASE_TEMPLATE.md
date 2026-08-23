@@ -1,29 +1,39 @@
+# Pi GUI release
+
+Pi GUI is a derivative of [Gustav Pi Desktop](https://github.com/gustavonline/pi-desktop), with selected React UI concepts and visual tokens adapted from [DLYZZT Pi Desktop](https://github.com/DLYZZT/pi-desktop). This is not an official release of either upstream project.
+
 ## Highlights
 
-- 
+-
 
-## UX / Product
+## Fixes
 
-- 
+-
 
-## Runtime / Reliability
-
-- 
-
-## Packages / Extensions
-
-- 
-
-## Platform artifacts
+## Artifacts
 
 - macOS: `.dmg`, `.app.tar.gz`
-- Windows: `.msi`, `nsis`
+- Windows: signed NSIS `setup.exe`, signed `.msi`
 - Linux: `.AppImage`, `.deb`
 
-## Notes
+## Release gates
 
-- If the `pi` CLI is missing, Pi Desktop now shows onboarding with install instructions.
-- macOS artifacts are currently unsigned/not notarized (Apple Developer signing deferred).
-  - If Gatekeeper blocks launch, run:
-    - `xattr -cr /Applications/Pi\ Desktop.app`
-- See README for setup and docs links.
+- [ ] Tag matches the package, Cargo, Tauri, and Linux metainfo versions.
+- [ ] CI and production dependency audit pass.
+- [ ] Windows clean-machine install, launch, update/reinstall, uninstall, and app-data preservation pass.
+- [ ] Cross-version Windows upgrade passes, or this is the first Pi GUI release and is marked N/A.
+- [ ] Windows NSIS and MSI signatures are `Valid`.
+- [ ] macOS signing and notarization pass.
+- [ ] Signed release smoke passes on Windows, macOS, and Linux.
+- [ ] Known issues and installation network requirements are documented.
+
+## Verification evidence
+
+- Commit:
+- Clean-machine run:
+- Signed release-smoke run:
+- Signing identities:
+
+## Known limitations
+
+-

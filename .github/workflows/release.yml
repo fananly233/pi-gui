@@ -1,4 +1,4 @@
-name: Release
+name: Release Candidate
 
 on:
   push:
@@ -7,8 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to release (example: v1.0.0)"
-        required: false
+        description: "Tag to build (example: v0.1.0)"
+        required: true
+        default: "v0.1.0"
         type: string
 
 permissions:
@@ -69,30 +70,39 @@ jobs:
         shell: bash
         run: |
           TAG="${{ github.ref_name }}"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ github.event.inputs.tag }}" ]]; then
-            TAG="${{ github.event.inputs.tag }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.tag }}"
           fi
-
           if [[ -z "$TAG" ]]; then
             echo "Unable to resolve release tag" >&2
             exit 1
           fi
-
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
-      - name: Build and publish (${{ matrix.os_name }})
+      - name: Validate source and release metadata
+        env:
+          RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
+        run: |
+          npm run check
+          npm test
+          npm run check:release
+          npm run build:frontend
+          cargo check --locked --manifest-path src-tauri/Cargo.toml
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
+          npm audit
+
+      - name: Build and upload draft (${{ matrix.os_name }})
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ steps.release_tag.outputs.tag }}
-          releaseName: "Pi Desktop ${{ steps.release_tag.outputs.tag }}"
+          releaseName: "Pi GUI ${{ steps.release_tag.outputs.tag }}"
           releaseBody: |
-            Cross-platform Pi Desktop release.
+            Draft build of Pi GUI, a derivative of Gustav Pi Desktop with selected UI material adapted from DLYZZT Pi Desktop.
 
-            Included platform artifacts are uploaded by GitHub Actions.
-            See README and docs for setup and usage.
-          releaseDraft: false
+            Do not publish this draft until signing and clean-machine release smoke checks are complete.
+          releaseDraft: true
           prerelease: ${{ contains(steps.release_tag.outputs.tag, '-') }}
           tauriScript: npm run tauri
           args: ${{ matrix.args }}

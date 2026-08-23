@@ -1,0 +1,98 @@
+name: Windows Clean-Machine Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      previous_tag:
+        description: "Optional previous Pi GUI tag for a cross-version upgrade test"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  install-lifecycle:
+    name: Build, install, launch, update, uninstall
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      PI_GUI_CLEAN_MACHINE: github-hosted-windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate candidate
+        shell: pwsh
+        run: |
+          npm run check
+          npm test
+          npm run check:release
+          cargo check --locked --manifest-path src-tauri/Cargo.toml
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
+          npm audit
+
+      - name: Build Windows installers
+        run: npm run tauri -- build --bundles nsis,msi
+
+      - name: MSI administrative extraction
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem "src-tauri/target/release/bundle/msi" -Filter "*.msi" | Select-Object -First 1).FullName
+          $target = Join-Path $env:RUNNER_TEMP "pi-gui-msi-extract"
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+          $arguments = "/a `"$msi`" /qn TARGETDIR=`"$target`""
+          $process = Start-Process msiexec.exe -ArgumentList $arguments -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "MSI administrative extraction failed with $($process.ExitCode)" }
+          if (-not (Get-ChildItem $target -Recurse -Filter "pi-gui.exe")) { throw "MSI did not contain pi-gui.exe" }
+
+      - name: Download previous release installer
+        if: inputs.previous_tag != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Path previous-assets -Force | Out-Null
+          gh release download "${{ inputs.previous_tag }}" `
+            --repo "${{ github.repository }}" `
+            --pattern "*setup.exe" `
+            --dir previous-assets
+
+      - name: NSIS clean-machine lifecycle
+        shell: pwsh
+        run: |
+          $installer = (Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*setup.exe" | Select-Object -First 1).FullName
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $arguments = @{
+            InstallerPath = $installer
+            ExpectedVersion = $version
+          }
+          if (Test-Path previous-assets) {
+            $arguments.PreviousInstallerPath = (Get-ChildItem previous-assets -Filter "*setup.exe" | Select-Object -First 1).FullName
+          }
+          ./scripts/windows-installer-smoke.ps1 @arguments
+
+      - name: Upload unsigned Windows candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: pi-gui-windows-unsigned-candidate
+          if-no-files-found: error
+          path: |
+            src-tauri/target/release/bundle/nsis/*setup.exe
+            src-tauri/target/release/bundle/msi/*.msi

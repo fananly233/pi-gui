@@ -1,4 +1,4 @@
-# Pi Desktop Tauri Migration Matrix
+# Pi GUI Tauri Migration Matrix
 
 This matrix records the approved migration boundary: Gustav Pi Desktop is the Tauri/Rust/Pi RPC base, while the DLYZZT project is a selective React UI donor. It is intentionally narrower than either upstream application.
 
@@ -150,6 +150,20 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | `npm run build` | PASS WITH LINKER INFO | Tauri produced a 16.60 MiB Windows x64 executable, a 5.74 MiB MSI, and a 4.00 MiB NSIS installer. Rust surfaced only the localized MSVC import-library linker message as `linker_messages`; bundling completed successfully. |
 | Read-only MCO Scout | PASS WITH MANUAL VERIFICATION | One scoped `pi:deepseek/deepseek-v4-flash` Scout informed release ownership, lifecycle, diagnostics, and rollback boundaries. Asset names, release metadata, Pi version behavior, and all security-sensitive paths were verified against the implementation and real gate. |
 | Static architecture scan | PASS | No Electron dependency/host, `window.piBridge`, Browser Agent, Channels, arbitrary runtime executable/environment input, global npm updater, or renderer shell process capability was introduced. |
+
+## Release preparation verification (2026-08-23, Windows)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Independent release identity | PASS | npm, lockfile, Cargo, Tauri, HTML, Linux metainfo, app title, and app-data keys now use Pi GUI / `pi-gui` / `com.pi.gui` / `0.1.0`. Stale Gustav repository package fields were removed; lineage attribution remains. |
+| `npm run check:release` with `RELEASE_TAG=v0.1.0` | PASS | The release-critical identity, installer policy, stable WiX upgrade code, and tag/version agreement are enforced. |
+| TypeScript, renderer, Rust, frontend, and audit gates | PASS | 19 renderer tests and 23 Rust tests passed; one real network runtime gate remained ignored. The frontend built 320 modules and the full npm audit reported zero vulnerabilities after a within-major Vite toolchain refresh. |
+| Windows `0.1.0` bundles | PASS WITH EXISTING LINKER INFO | Tauri produced a 4,187,406-byte NSIS installer and a 6,021,120-byte MSI. Only the existing localized MSVC import-library linker message was emitted. |
+| Generated installer policy | PASS | NSIS is current-user with bundle ID `com.pi.gui`; MSI is per-machine; both use `0.1.0`; downgrades are blocked; WiX uses `bc684a49-735f-5100-8ea3-5bb516c8f702`. |
+| MSI administrative extraction and isolated launch | PASS, NOT CLEAN-MACHINE | The MSI contained `pi-gui.exe`, and the extracted binary stayed alive for eight seconds under isolated app-data environment variables. No installer was run on the development machine. |
+| Windows Authenticode | BLOCKED | Main EXE, NSIS, and MSI all report `NotSigned`; the signed-release workflow rejects this state. |
+| GitHub-hosted clean-machine lifecycle | PREPARED, NOT RUN | The manual workflow builds on a fresh Windows runner and checks install, launch, update/reinstall, uninstall, shortcuts, registry cleanup, and app-data preservation. No independent `origin` exists yet, so no remote run is claimed. |
+| Read-only MCO release Scout | UNAVAILABLE | MCO failed on Windows with `module 'os' has no attribute 'getuid'`; no Scout conclusion was used. |
 
 ## Migration decisions
 

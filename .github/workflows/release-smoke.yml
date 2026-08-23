@@ -1,12 +1,16 @@
-name: Release Smoke
+name: Signed Release Smoke
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to smoke test (example: v1.0.0)"
+        description: "Signed Pi GUI release tag to verify"
         required: true
-        default: "v1.0.0"
+        default: "v0.1.0"
+        type: string
+      previous_tag:
+        description: "Optional previous signed tag for a Windows upgrade test"
+        required: false
         type: string
 
 permissions:
@@ -14,14 +18,16 @@ permissions:
 
 jobs:
   smoke-macos:
-    name: Smoke macOS installers
+    name: Verify macOS artifacts
     runs-on: macos-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout release source
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
 
-      - name: Download release assets (macOS)
+      - name: Download release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -31,47 +37,44 @@ jobs:
             --pattern "*.dmg" \
             --pattern "*.app.tar.gz" \
             --dir smoke-assets
-          ls -lah smoke-assets
 
-      - name: Validate DMG + app archive
+      - name: Verify bundle, signature, and archive
         run: |
           set -euo pipefail
-          DMG="$(ls smoke-assets/*.dmg | head -n1)"
-          APP_TAR="$(ls smoke-assets/*.app.tar.gz | head -n1)"
-
+          DMG="$(find smoke-assets -maxdepth 1 -name '*.dmg' -print -quit)"
+          APP_TAR="$(find smoke-assets -maxdepth 1 -name '*.app.tar.gz' -print -quit)"
           test -s "$DMG"
           test -s "$APP_TAR"
 
-          MOUNT_DIR="/tmp/pi-desktop-smoke-mount"
-          rm -rf "$MOUNT_DIR"
-          mkdir -p "$MOUNT_DIR"
-
+          MOUNT_DIR="$(mktemp -d /tmp/pi-gui-smoke.XXXXXX)"
+          trap 'hdiutil detach "$MOUNT_DIR" -quiet 2>/dev/null || true; rm -rf "$MOUNT_DIR"' EXIT
           hdiutil attach "$DMG" -nobrowse -quiet -mountpoint "$MOUNT_DIR"
-          test -d "$MOUNT_DIR/Pi Desktop.app"
-          test -f "$MOUNT_DIR/Pi Desktop.app/Contents/MacOS/pi-desktop"
+          APP_PATH="$MOUNT_DIR/Pi GUI.app"
+          test -f "$APP_PATH/Contents/MacOS/pi-gui"
+          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          spctl --assess --type execute --verbose=2 "$APP_PATH"
           hdiutil detach "$MOUNT_DIR" -quiet
 
-          rm -rf smoke-macos-unpacked
-          mkdir -p smoke-macos-unpacked
+          mkdir smoke-macos-unpacked
           tar -xzf "$APP_TAR" -C smoke-macos-unpacked
-
-          APP_PATH="$(find smoke-macos-unpacked -maxdepth 2 -name "Pi Desktop.app" -type d | head -n1)"
-          test -n "$APP_PATH"
-          test -f "$APP_PATH/Contents/MacOS/pi-desktop"
-
-      - name: Summary
-        run: |
-          echo "✅ macOS smoke checks passed for ${{ inputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          ARCHIVE_APP="$(find smoke-macos-unpacked -maxdepth 2 -name 'Pi GUI.app' -type d -print -quit)"
+          test -f "$ARCHIVE_APP/Contents/MacOS/pi-gui"
+          codesign --verify --deep --strict --verbose=2 "$ARCHIVE_APP"
 
   smoke-windows:
-    name: Smoke Windows installers
+    name: Install, launch, update, and uninstall on Windows
     runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      PI_GUI_CLEAN_MACHINE: github-hosted-windows
 
     steps:
-      - name: Checkout
+      - name: Checkout release source
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
 
-      - name: Download release assets (Windows)
+      - name: Download current release assets
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -82,77 +85,68 @@ jobs:
             --pattern "*setup.exe" `
             --pattern "*.msi" `
             --dir smoke-assets
-          Get-ChildItem smoke-assets | Format-Table Name,Length
 
-      - name: Validate installer files + signatures
+      - name: Download previous installer
+        if: inputs.previous_tag != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          New-Item -ItemType Directory -Path previous-assets -Force | Out-Null
+          gh release download "${{ inputs.previous_tag }}" `
+            --repo "${{ github.repository }}" `
+            --pattern "*setup.exe" `
+            --dir previous-assets
+
+      - name: Require valid Windows signatures
         shell: pwsh
         run: |
-          $exe = Get-ChildItem smoke-assets -Filter "*setup.exe" | Select-Object -First 1
-          $msi = Get-ChildItem smoke-assets -Filter "*.msi" | Select-Object -First 1
-
-          if (-not $exe -or -not $msi) {
-            throw "Missing setup.exe or .msi asset"
-          }
-          if ($exe.Length -le 0 -or $msi.Length -le 0) {
-            throw "One or more installer assets are empty"
+          $assets = @(Get-ChildItem smoke-assets -File)
+          if (($assets | Where-Object Name -Like "*setup.exe").Count -ne 1) { throw "Expected one NSIS installer" }
+          if (($assets | Where-Object Extension -EQ ".msi").Count -ne 1) { throw "Expected one MSI installer" }
+          foreach ($asset in $assets) {
+            $signature = Get-AuthenticodeSignature $asset.FullName
+            if ($signature.Status -ne "Valid") { throw "$($asset.Name) signature is $($signature.Status), expected Valid" }
           }
 
-          $exeSig = Get-AuthenticodeSignature $exe.FullName
-          $msiSig = Get-AuthenticodeSignature $msi.FullName
-
-          Write-Host "EXE signature status: $($exeSig.Status)"
-          Write-Host "MSI signature status: $($msiSig.Status)"
-
-      - name: MSI administrative extract check
+      - name: Verify MSI contents
         shell: pwsh
         run: |
           $msi = (Get-ChildItem smoke-assets -Filter "*.msi" | Select-Object -First 1).FullName
-          New-Item -ItemType Directory -Path smoke-msi-extract -Force | Out-Null
-          $target = (Resolve-Path "smoke-msi-extract").Path
+          $target = Join-Path $env:RUNNER_TEMP "pi-gui-msi-extract"
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+          $arguments = "/a `"$msi`" /qn TARGETDIR=`"$target`""
+          $process = Start-Process msiexec.exe -ArgumentList $arguments -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "MSI extraction failed with $($process.ExitCode)" }
+          $executable = Get-ChildItem $target -Recurse -Filter "pi-gui.exe" | Select-Object -First 1
+          if (-not $executable) { throw "MSI did not contain pi-gui.exe" }
+          $signature = Get-AuthenticodeSignature $executable.FullName
+          if ($signature.Status -ne "Valid") { throw "MSI payload signature is $($signature.Status), expected Valid" }
 
-          $args = "/a `"$msi`" /qn TARGETDIR=`"$target`""
-          Start-Process -FilePath "msiexec.exe" -ArgumentList $args -Wait -NoNewWindow
-
-          $exeCandidates = Get-ChildItem -Path smoke-msi-extract -Recurse -Filter "*.exe" -ErrorAction SilentlyContinue
-          if (-not $exeCandidates -or $exeCandidates.Count -eq 0) {
-            throw "No executables found after MSI administrative extract"
-          }
-          Write-Host "MSI extracted executable count: $($exeCandidates.Count)"
-
-      - name: NSIS extraction check
+      - name: Verify NSIS lifecycle
         shell: pwsh
         run: |
-          $setupExe = (Get-ChildItem smoke-assets -Filter "*setup.exe" | Select-Object -First 1).FullName
-          New-Item -ItemType Directory -Path smoke-nsis-extract -Force | Out-Null
-
-          $sevenZip = (Get-Command 7z -ErrorAction SilentlyContinue).Source
-          if (-not $sevenZip) {
-            choco install 7zip -y
-            $sevenZip = (Get-Command 7z -ErrorAction Stop).Source
+          $arguments = @{
+            InstallerPath = (Get-ChildItem smoke-assets -Filter "*setup.exe" | Select-Object -First 1).FullName
+            ExpectedVersion = "${{ inputs.tag }}".TrimStart("v")
+            RequireSignature = $true
           }
-
-          & $sevenZip x $setupExe "-osmoke-nsis-extract" -y | Out-Host
-
-          $files = Get-ChildItem -Path smoke-nsis-extract -Recurse -ErrorAction SilentlyContinue
-          if (-not $files -or $files.Count -eq 0) {
-            throw "NSIS extraction produced no files"
+          if (Test-Path previous-assets) {
+            $arguments.PreviousInstallerPath = (Get-ChildItem previous-assets -Filter "*setup.exe" | Select-Object -First 1).FullName
           }
-          Write-Host "NSIS extracted file count: $($files.Count)"
-
-      - name: Summary
-        shell: pwsh
-        run: |
-          "✅ Windows smoke checks passed for ${{ inputs.tag }}" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+          ./scripts/windows-installer-smoke.ps1 @arguments
 
   smoke-linux:
-    name: Smoke Linux installers
+    name: Verify Linux artifacts
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout
+      - name: Checkout release source
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag }}
 
-      - name: Download release assets (Linux)
+      - name: Download release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -162,32 +156,24 @@ jobs:
             --pattern "*.AppImage" \
             --pattern "*.deb" \
             --dir smoke-assets
-          ls -lah smoke-assets
 
-      - name: Validate .deb contents
+      - name: Verify DEB contents
         run: |
           set -euo pipefail
-          DEB="$(ls smoke-assets/*.deb | head -n1)"
+          DEB="$(find smoke-assets -maxdepth 1 -name '*.deb' -print -quit)"
           test -s "$DEB"
-
           dpkg-deb --info "$DEB"
           dpkg-deb --contents "$DEB" | tee deb-contents.txt
+          grep -q "usr/share/metainfo/com.pi.gui.metainfo.xml" deb-contents.txt
+          grep -q "usr/bin/pi-gui" deb-contents.txt
 
-          grep -q "usr/share/metainfo/com.pi.desktop.metainfo.xml" deb-contents.txt
-
-      - name: Validate AppImage extraction
+      - name: Verify AppImage contents
         run: |
           set -euo pipefail
-          APPIMAGE="$(ls smoke-assets/*.AppImage | head -n1)"
+          APPIMAGE="$(find smoke-assets -maxdepth 1 -name '*.AppImage' -print -quit)"
           test -s "$APPIMAGE"
-
           chmod +x "$APPIMAGE"
-          "./$APPIMAGE" --appimage-extract > /dev/null
-
-          test -d squashfs-root
+          "$APPIMAGE" --appimage-extract > /dev/null
           test -f squashfs-root/AppRun
-          test -f squashfs-root/usr/share/metainfo/com.pi.desktop.metainfo.xml
-
-      - name: Summary
-        run: |
-          echo "✅ Linux smoke checks passed for ${{ inputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          test -f squashfs-root/usr/share/metainfo/com.pi.gui.metainfo.xml
+          test -f squashfs-root/usr/bin/pi-gui

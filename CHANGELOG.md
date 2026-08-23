@@ -4,15 +4,32 @@ All notable changes to this project are documented in this file.
 
 The format is inspired by [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [0.1.0] - Unreleased
+
+First Pi GUI release candidate. This version is an independently modified derivative of Gustav Pi Desktop with selected DLYZZT React UI material.
+
+### Added
+
+- React 19 renderer on the existing Tauri 2/Rust host.
+- Real Pi RPC chat, sessions, models, authentication metadata, workspace files, image attachments, native terminal, typed Git/worktree flows, and Pi ecosystem management.
+- Versioned app-owned Pi runtime installation with published SHA-256 verification, transactional activation, rollback, recovery, and an explicit system-Pi fallback.
+- Release metadata validation and a clean-machine Windows installer lifecycle gate.
 
 ### Changed
-- Added a Settings → Updates advanced control for manual Pi binary override (`pi_path`) with browse/save/clear actions, so users can pin an explicit `pi` executable path across all OSes.
-- RPC/CLI command bridge now carries a preferred manual Pi binary override for runtime start and non-runtime CLI actions (status/list/install/update flows).
 
-### Fixed
-- Improved Linux/macOS fallback discovery for global npm installs by checking additional common user-prefix locations (including `~/.npm-global/bin/pi`) and npm prefix environment hints.
-- Explicit Pi path resolution now supports `~`-prefixed paths in manual settings/env override flows.
+- Product identity is `Pi GUI` / `pi-gui` / `com.pi.gui`, versioned independently from the donor repositories.
+- Windows NSIS uses current-user scope, downgrades are disabled, and the WiX upgrade identity is fixed.
+- Cross-platform release automation now creates drafts until signing and clean-machine verification are complete.
+
+### Security
+
+- Electron host code, unrestricted shell execution, general renderer filesystem access, and WebView-controlled runtime executables/environments are excluded.
+- Refreshed the locked Vite 7 build chain to versions with zero current npm audit findings.
+- Public Windows release smoke requires valid Authenticode signatures.
+
+## Inherited Gustav history
+
+The entries below were inherited with the Gustav base revision. They document upstream history and are not Pi GUI release records.
 
 ## [1.0.0] - 2026-04-13
 

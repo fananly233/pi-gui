@@ -1,6 +1,6 @@
-# Pi CLI → Pi Desktop Feature Mapping
+# Pi CLI → Pi GUI Feature Mapping
 
-This document describes the code that exists on `feat/tauri-react-migration` after Phase 8. It intentionally does not count inherited Gustav UI claims that are not present in the React renderer.
+This document describes the code that exists on `feat/tauri-react-migration` after Phase 8 and the first release-preparation pass. It intentionally does not count inherited Gustav UI claims that are not present in the React renderer.
 
 ## Foundation
 
@@ -105,6 +105,7 @@ Package operations are serialized, capped at 512 KiB of captured output, limited
 
 ## Remaining release work
 
-- Execute installer/uninstaller and upgrade checks on clean Windows machines, plus equivalent macOS/Linux package gates.
-- Configure code signing/notarization and release-channel policy.
-- Finalize product branding, repository URLs, and versioning before public release.
+- Run the prepared installer lifecycle workflow on a clean hosted Windows runner; no such run has been claimed from the development machine.
+- Configure Windows signing and macOS signing/notarization, then pass the signed cross-platform release-smoke workflow.
+- Connect an independent repository URL while retaining the derivative-work declaration.
+- Run a true cross-version upgrade gate once an earlier Pi GUI release exists; `0.1.0` can only prove the update/reinstall path.
