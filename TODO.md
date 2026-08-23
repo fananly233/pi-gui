@@ -21,8 +21,8 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 
 ## Blocking before first public push
 
-- [ ] Review the final staged diff and `git diff --check`.
-- [ ] Commit the documentation/privacy pass with the repository-local noreply identity.
+- [x] Review the final staged diff and `git diff --check`.
+- [x] Commit the documentation/privacy pass with the repository-local noreply identity (`df39d05`).
 - [ ] Create or select the independent Pi GUI repository.
 - [ ] Add its credential-free URL as `origin`; keep `gustav` and `dlyzzt` as donor remotes.
 - [ ] Push only the reviewed Pi GUI branch. Do not push `archive/electron-mvp`, use `--all`, or use `--mirror`.
@@ -31,7 +31,7 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 
 ## Blocking before public release
 
-- [ ] Harden the real-PTY test to wait for the observed DSR before replying, cover the Windows `cmd` fallback, and prove repeated cold-start reliability. This needs a separately authorized code change.
+- [x] Harden the real-PTY test to wait for the observed DSR before replying, cover the Windows `cmd.exe` fallback, and prove both paths across six independent test-process runs.
 - [ ] Run **Windows Clean-Machine Candidate** from the independent repository.
 - [ ] Record install, launch, same-version update/reinstall, uninstall, registry cleanup, and app-data preservation evidence.
 - [ ] Configure Windows Authenticode signing for NSIS and MSI.

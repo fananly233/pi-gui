@@ -1607,10 +1607,21 @@ fn terminal_shell() -> Result<(PathBuf, String, Vec<String>), String> {
 
 fn spawn_terminal_process(root: &Path, cols: u16, rows: u16) -> Result<SpawnedTerminal, String> {
     let (shell_path, shell, args) = terminal_shell()?;
+    spawn_terminal_process_with_shell(root, cols, rows, &shell_path, &shell, &args)
+}
+
+fn spawn_terminal_process_with_shell(
+    root: &Path,
+    cols: u16,
+    rows: u16,
+    shell_path: &Path,
+    shell: &str,
+    args: &[String],
+) -> Result<SpawnedTerminal, String> {
     let pair = native_pty_system()
         .openpty(terminal_size(cols, rows))
         .map_err(|e| format!("Could not open a native PTY: {}", e))?;
-    let mut command = CommandBuilder::new(&shell_path);
+    let mut command = CommandBuilder::new(shell_path);
     command.args(args);
     command.cwd(external_command_path(root));
     command.env("TERM", "xterm-256color");
@@ -1630,7 +1641,7 @@ fn spawn_terminal_process(root: &Path, cols: u16, rows: u16) -> Result<SpawnedTe
         .take_writer()
         .map_err(|e| format!("Could not open terminal input: {}", e))?;
     Ok(SpawnedTerminal {
-        shell,
+        shell: shell.to_string(),
         pid,
         child,
         reader,
@@ -4135,9 +4146,9 @@ mod tests {
         get_git_workspace_status_impl, index_workspace_files_impl, list_git_worktrees_impl,
         list_workspace_directory_impl, normalize_auth_provider, parse_git_status,
         parse_pi_package_list, read_session_file, read_workspace_text_file_impl,
-        remove_git_worktree_impl, spawn_terminal_process, validate_pi_install_source,
-        validate_pi_package_source, write_workspace_text_file_impl, PiPackageScope, PiThemeScope,
-        MAX_WORKSPACE_FILE_BYTES,
+        remove_git_worktree_impl, spawn_terminal_process, spawn_terminal_process_with_shell,
+        validate_pi_install_source, validate_pi_package_source, write_workspace_text_file_impl,
+        PiPackageScope, PiThemeScope, SpawnedTerminal, MAX_WORKSPACE_FILE_BYTES,
     };
     use std::fs;
     use std::io::{Read, Write};
@@ -4146,6 +4157,8 @@ mod tests {
     use std::sync::mpsc;
     use std::thread;
     use std::time::Duration;
+    #[cfg(target_os = "windows")]
+    use std::time::Instant;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn test_root() -> std::path::PathBuf {
@@ -4464,11 +4477,7 @@ mod tests {
         fs::remove_dir_all(&root).expect("clean test root");
     }
 
-    #[test]
-    fn opens_a_real_native_terminal_pty() {
-        let root = test_root();
-        fs::create_dir_all(&root).expect("create terminal test root");
-        let terminal = spawn_terminal_process(&root, 100, 30).expect("spawn native terminal");
+    fn assert_native_terminal_round_trip(terminal: SpawnedTerminal) {
         let shell = terminal.shell.to_lowercase();
         let mut child = terminal.child;
         let mut writer = terminal.writer;
@@ -4482,15 +4491,52 @@ mod tests {
             "printf '__PI_PTY_OK__\\n'; exit 0\n"
         };
         let (output_tx, output_rx) = mpsc::channel();
-        thread::spawn(move || {
-            let mut bytes = Vec::new();
-            let _ = reader.read_to_end(&mut bytes);
-            let _ = output_tx.send(bytes);
+        let output_thread = thread::spawn(move || {
+            let mut buffer = [0_u8; 1024];
+            loop {
+                match reader.read(&mut buffer) {
+                    Ok(0) | Err(_) => break,
+                    Ok(count) => {
+                        if output_tx.send(buffer[..count].to_vec()).is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
         });
-        if cfg!(target_os = "windows") && shell != "cmd" {
+
+        let mut output = Vec::new();
+        #[cfg(target_os = "windows")]
+        {
+            let dsr = b"\x1b[6n";
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while !output.windows(dsr.len()).any(|window| window == dsr) {
+                let now = Instant::now();
+                if now >= deadline {
+                    break;
+                }
+                match output_rx.recv_timeout(deadline.saturating_duration_since(now)) {
+                    Ok(bytes) => output.extend_from_slice(&bytes),
+                    Err(_) => break,
+                }
+            }
+            if !output.windows(dsr.len()).any(|window| window == dsr) {
+                let _ = child.kill();
+                drop(writer);
+                drop(master);
+                output_thread.join().expect("join terminal output reader");
+                while let Ok(bytes) = output_rx.try_recv() {
+                    output.extend_from_slice(&bytes);
+                }
+                panic!(
+                    "terminal shell {} did not request cursor position: {}",
+                    shell,
+                    String::from_utf8_lossy(&output)
+                );
+            }
             writer
                 .write_all(b"\x1b[1;1R")
-                .expect("answer PowerShell cursor-position probe");
+                .expect("answer terminal cursor-position probe");
         }
         writer
             .write_all(command.as_bytes())
@@ -4508,12 +4554,19 @@ mod tests {
         if exit.is_none() {
             let _ = child.kill();
         }
-        let exit = exit.expect("terminal shell did not exit after probe");
         drop(writer);
         drop(master);
-        let output = output_rx
-            .recv_timeout(Duration::from_secs(3))
-            .expect("read terminal probe output");
+        output_thread.join().expect("join terminal output reader");
+        while let Ok(bytes) = output_rx.try_recv() {
+            output.extend_from_slice(&bytes);
+        }
+        let exit = exit.unwrap_or_else(|| {
+            panic!(
+                "terminal shell {} did not exit after probe: {}",
+                shell,
+                String::from_utf8_lossy(&output)
+            )
+        });
         assert!(
             exit.success(),
             "terminal shell {} exited with {}: {}",
@@ -4522,6 +4575,27 @@ mod tests {
             String::from_utf8_lossy(&output)
         );
         assert!(String::from_utf8_lossy(&output).contains("__PI_PTY_OK__"));
+    }
+
+    #[test]
+    fn opens_a_real_native_terminal_pty() {
+        let root = test_root();
+        fs::create_dir_all(&root).expect("create terminal test root");
+        let terminal = spawn_terminal_process(&root, 100, 30).expect("spawn native terminal");
+        assert_native_terminal_round_trip(terminal);
+        fs::remove_dir_all(&root).expect("clean terminal test root");
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn opens_a_real_native_cmd_terminal_pty() {
+        let root = test_root();
+        fs::create_dir_all(&root).expect("create cmd terminal test root");
+        let shell_path = which::which("cmd.exe").expect("locate cmd terminal fallback");
+        let args = vec!["/Q".to_string()];
+        let terminal = spawn_terminal_process_with_shell(&root, 100, 30, &shell_path, "cmd", &args)
+            .expect("spawn cmd terminal fallback");
+        assert_native_terminal_round_trip(terminal);
         fs::remove_dir_all(&root).expect("clean terminal test root");
     }
 
