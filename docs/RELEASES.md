@@ -2,7 +2,7 @@
 
 ## Current state
 
-`0.1.0` is an unpublished release candidate. Pi GUI has no independent `origin` remote yet, and the locally generated Windows installers are not signed. The Gustav project’s releases are upstream history, not Pi GUI releases.
+`0.1.0` is an unpublished release candidate. The independent repository is [fananly233/pi-gui](https://github.com/fananly233/pi-gui), and the locally generated Windows installers are not signed. The Gustav project’s releases are upstream history, not Pi GUI releases.
 
 ## Pre-push privacy status
 
@@ -13,7 +13,7 @@ Recorded on Windows on 2026-08-23:
 - the local migration control prompt is ignored and has never appeared in Git history;
 - remote URLs contain no embedded credentials;
 - historical test-key and credential-URL fixtures exist only on the local `archive/electron-mvp` donor branch, not in `HEAD`; that branch must not be pushed to the independent repository;
-- all 26 post-fork commits now use the connected public GitHub identity and GitHub noreply author/committer email. The explicitly approved rewrite preserved commit count, topology, subjects, dates, and the final source tree while changing the derivative commit SHAs;
+- all derivative commits through the current `HEAD` use the connected public GitHub identity and GitHub noreply author/committer email. The explicitly approved rewrite preserved commit count, topology, subjects, dates, and the final source tree while changing the rewritten commit SHAs;
 - six donor-only issue/development logs remain local but are removed from the Git index and covered by exact ignore rules.
 
 `npm run check:publish` now passes across 143 tracked/non-ignored candidate files. It automates the content/history/metadata/remote/attribution checks and redacts suspected values from its output.
@@ -29,7 +29,7 @@ Recorded on Windows on 2026-08-23:
 | Windows publisher metadata | `Pi GUI contributors` |
 | WiX upgrade code | `bc684a49-735f-5100-8ea3-5bb516c8f702` |
 
-The package deliberately omits homepage, repository, and issue-tracker URLs until an independent repository is connected. Lineage links remain in the README and third-party notices.
+The npm, Cargo, Linux metainfo, contribution, issue, and security metadata point to `https://github.com/fananly233/pi-gui`. Lineage links remain in the README and third-party notices.
 
 ## Windows installer policy
 
@@ -66,17 +66,17 @@ Recorded on Windows on 2026-08-23:
 | Rust check and library tests | PASS | `cargo check --locked` passes. The real PTY test now waits until the shell emits DSR before replying with CPR, and a separate Windows test exercises the explicit `cmd.exe` fallback. The selected PowerShell path and `cmd.exe` each passed six independent test-process runs; the final serial library run passed 24 tests with one network gate ignored. The production React/xterm path was unchanged. |
 | Frontend production build | PASS | 320 modules built. |
 | Full dependency audit | PASS | Zero reported production or development dependency vulnerabilities after updating the locked Vite 7 toolchain within its existing major version. |
-| Windows bundle build | PASS WITH LINKER INFO | Produced a 4,187,406-byte NSIS installer and a 6,021,120-byte MSI. The only Rust warning was the localized MSVC import-library linker message. |
+| Windows bundle build | PASS WITH LINKER INFO | Rebuilt the current candidate as a 4,190,762-byte NSIS installer and a 6,021,120-byte MSI. The only Rust warning was the localized MSVC import-library linker message. |
 | Generated installer metadata | PASS | `Pi GUI`, `0.1.0`, `com.pi.gui`, current-user NSIS, per-machine MSI, fixed upgrade code, and downgrade blocking were present. |
 | MSI extraction and isolated executable launch | PASS, NOT CLEAN-MACHINE | Administrative extraction contained `pi-gui.exe`; it remained alive for eight seconds with isolated app-data environment variables. No installer was run on the development machine. |
 | Windows signatures | BLOCKED | Main EXE, NSIS, and MSI all report `NotSigned`. |
-| Hosted clean-machine lifecycle | NOT RUN | Workflow is prepared, but this checkout has no independent `origin` from which to execute it. |
+| Hosted clean-machine lifecycle | NOT RUN | The independent `origin` is connected. The workflow can run after the reviewed history replaces the generated, unrelated one-file `main` branch. |
 
 Candidate SHA-256 values:
 
-- `pi-gui.exe`: `3E8DA926D49F7F7D0046DF9F11CC53E43C69598A61BECD06BDB6B7E19017F4E4`
-- `Pi GUI_0.1.0_x64-setup.exe`: `E68DDF66EC0BF7B2AC873F94ED551978EB5EC3407588F064A49D5B396AFFE970`
-- `Pi GUI_0.1.0_x64_en-US.msi`: `9BAA6D8D032AB967338D47A7DFB772A7F868AB42A9273C3C343CA4D8203858E0`
+- `pi-gui.exe` (17,406,464 bytes): `F89AB5C969A93378AB6E6E4EB55FF5116C2A5FD12E36A11B3CE297096A9F3B20`
+- `Pi GUI_0.1.0_x64-setup.exe` (4,190,762 bytes): `5B86E6FE43B0F4E232D753DD591DDFE744D3465FF7C67155A0057BDC8385BD56`
+- `Pi GUI_0.1.0_x64_en-US.msi` (6,021,120 bytes): `1E1DD4E5BC57085A6B9DEBDA9614C49F2C7446A3AE0BAB77EABCA779A65AB371`
 
 ## Required local gates
 
@@ -111,8 +111,8 @@ Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive
 1. Confirm `package.json`, Cargo, Tauri, Linux metainfo, and the intended tag all agree.
 2. Run the local gates and record exact results.
 3. Re-run `check:publish` on the final clean commit and review the branch diff against the Gustav base.
-4. Connect an independent repository whose README and release notes retain the derivative-work declaration and whose security settings enable private vulnerability reporting.
-5. Push only the reviewed Pi GUI branch without merging or pushing donor-only histories.
+4. Confirm the independent repository URL, derivative-work declaration, and private vulnerability-reporting setting.
+5. Push only the reviewed Pi GUI history without merging or pushing donor-only histories.
 6. Run **Windows Clean-Machine Candidate**. A cross-version upgrade result is required once a prior Pi GUI release exists.
 7. Configure Windows signing and macOS signing/notarization. The current workflow intentionally creates a draft release only.
 8. Run **Signed Release Smoke** against the draft assets.

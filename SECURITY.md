@@ -2,15 +2,15 @@
 
 ## Supported versions
 
-Pi GUI `0.1.0` is an unpublished candidate. There is no supported public release line yet, and locally generated unsigned installers are not public release artifacts.
+Pi GUI `0.1.0` is an unpublished candidate. The source repository is public, but there is no supported release line yet and locally generated unsigned installers are not public release artifacts.
 
-This section will list supported versions after the independent repository, signing, and clean-machine release gates are operational.
+This section will list supported versions after signing and clean-machine release gates are operational.
 
 ## Reporting a vulnerability
 
 Do not open a public issue containing vulnerability details, credentials, private prompts, session files, or reproduction data from a private repository.
 
-Before the first public release, the independent Pi GUI repository must enable GitHub private vulnerability reporting. Use that private channel once it is available. Pi GUI reports must not be sent to the Gustav or DLYZZT maintainers unless the issue is independently reproduced in their project.
+Before the first public release, the Pi GUI repository must enable [GitHub private vulnerability reporting](https://github.com/fananly233/pi-gui/security/advisories/new). Use that private channel once it is available. Pi GUI reports must not be sent to the Gustav or DLYZZT maintainers unless the issue is independently reproduced in their project.
 
 A useful report includes:
 
@@ -20,7 +20,7 @@ A useful report includes:
 - redacted logs or screenshots;
 - suggested remediation, if known.
 
-The project currently has no public security intake address. Publishing remains blocked until a private reporting channel is configured.
+If the private advisory form is unavailable, private vulnerability reporting is not yet enabled. Do not put sensitive details in a public issue; publishing remains blocked until the private channel is operational.
 
 ## Security boundary
 

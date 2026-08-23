@@ -5,6 +5,14 @@
 	"type": "module",
 	"description": "Pi GUI - A Tauri desktop client for the Pi coding agent",
 	"license": "MIT",
+	"homepage": "https://github.com/fananly233/pi-gui#readme",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/fananly233/pi-gui.git"
+	},
+	"bugs": {
+		"url": "https://github.com/fananly233/pi-gui/issues"
+	},
 	"scripts": {
 		"dev": "vite --port 1420",
 		"tauri": "tauri",

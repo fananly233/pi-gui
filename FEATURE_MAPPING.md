@@ -105,8 +105,8 @@ Package operations are serialized, capped at 512 KiB of captured output, limited
 
 ## Remaining release work
 
-- Re-run `npm run check:publish` on the final clean commit before connecting/pushing the independent repository.
+- Re-run `npm run check:publish` on every release-facing commit before pushing it to the independent repository.
 - Run the prepared installer lifecycle workflow on a clean hosted Windows runner; no such run has been claimed from the development machine.
 - Configure Windows signing and macOS signing/notarization, then pass the signed cross-platform release-smoke workflow.
-- Connect an independent repository URL and private vulnerability-reporting route while retaining the derivative-work declaration.
+- Enable and verify the independent repository's private vulnerability-reporting route while retaining the derivative-work declaration.
 - Run a true cross-version upgrade gate once an earlier Pi GUI release exists; `0.1.0` can only prove the update/reinstall path.

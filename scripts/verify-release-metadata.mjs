@@ -16,12 +16,17 @@ const tauriConfig = readJson("src-tauri/tauri.conf.json");
 const cargoToml = fs.readFileSync("src-tauri/Cargo.toml", "utf8");
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const metainfo = fs.readFileSync("src-tauri/linux/com.pi.gui.metainfo.xml", "utf8");
+const repositoryUrl = "https://github.com/fananly233/pi-gui";
 
 requireMatch(packageJson.name, "pi-gui", "npm package name");
 requireMatch(packageLock.name, packageJson.name, "npm lockfile name");
 requireMatch(packageLock.version, packageJson.version, "npm lockfile version");
 requireMatch(packageLock.packages[""].name, packageJson.name, "npm lockfile root name");
 requireMatch(packageLock.packages[""].version, packageJson.version, "npm lockfile root version");
+requireMatch(packageJson.homepage, `${repositoryUrl}#readme`, "npm homepage");
+requireMatch(packageJson.repository?.type, "git", "npm repository type");
+requireMatch(packageJson.repository?.url, `git+${repositoryUrl}.git`, "npm repository URL");
+requireMatch(packageJson.bugs?.url, `${repositoryUrl}/issues`, "npm issue tracker");
 requireMatch(tauriConfig.$schema, "https://schema.tauri.app/config/2", "Tauri schema");
 requireMatch(tauriConfig.productName, "Pi GUI", "Tauri product name");
 requireMatch(tauriConfig.identifier, "com.pi.gui", "Tauri identifier");
@@ -42,8 +47,14 @@ requireMatch(
 
 const cargoName = cargoToml.match(/^name = "([^"]+)"/m)?.[1];
 const cargoVersion = cargoToml.match(/^version = "([^"]+)"/m)?.[1];
+const cargoLicense = cargoToml.match(/^license = "([^"]+)"/m)?.[1];
+const cargoHomepage = cargoToml.match(/^homepage = "([^"]+)"/m)?.[1];
+const cargoRepository = cargoToml.match(/^repository = "([^"]+)"/m)?.[1];
 requireMatch(cargoName, packageJson.name, "Cargo package name");
 requireMatch(cargoVersion, packageJson.version, "Cargo package version");
+requireMatch(cargoLicense, packageJson.license, "Cargo package license");
+requireMatch(cargoHomepage, repositoryUrl, "Cargo homepage");
+requireMatch(cargoRepository, repositoryUrl, "Cargo repository");
 
 if (!indexHtml.includes("<title>Pi GUI</title>")) {
 	throw new Error("index.html title is not Pi GUI");
@@ -57,10 +68,9 @@ if (!metainfo.includes("<name>Pi GUI</name>")) {
 if (!metainfo.includes(`<release version="${packageJson.version}" />`)) {
 	throw new Error(`Linux metainfo does not declare version ${packageJson.version}`);
 }
-
-for (const staleField of ["homepage", "repository", "bugs"]) {
-	if (Object.hasOwn(packageJson, staleField)) {
-		throw new Error(`package.json ${staleField} must remain unset until an independent origin exists`);
+for (const url of [repositoryUrl, `${repositoryUrl}/issues`]) {
+	if (!metainfo.includes(`>${url}</url>`)) {
+		throw new Error(`Linux metainfo does not declare ${url}`);
 	}
 }
 

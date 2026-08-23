@@ -18,14 +18,12 @@ Phases 1–8 are implemented:
 - Pi package operations and runtime resource discovery;
 - verified, versioned, app-owned Pi runtime with rollback and system-Pi fallback.
 
-The remaining `0.1.0` work is release engineering, not feature expansion:
+The independent repository, public metadata, attribution, and derivative commit-identity cleanup are complete. The remaining `0.1.0` work is release engineering, not feature expansion:
 
-1. finish public documentation and repository privacy cleanup;
-2. rewrite post-fork commit identity only after explicit maintainer approval;
-3. connect an independent repository and private vulnerability-reporting route;
-4. run the prepared Windows clean-machine lifecycle workflow;
-5. configure Windows signing and macOS signing/notarization;
-6. pass signed release smoke and publish the first Pi GUI release.
+1. enable and verify the private vulnerability-reporting route;
+2. run the prepared Windows clean-machine lifecycle workflow;
+3. configure Windows signing and macOS signing/notarization;
+4. pass signed release smoke and publish the first Pi GUI release.
 
 ## After 0.1
 

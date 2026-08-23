@@ -6,6 +6,8 @@
   <metadata_license>MIT</metadata_license>
   <project_license>MIT</project_license>
   <developer_name>Pi GUI Contributors</developer_name>
+  <url type="homepage">https://github.com/fananly233/pi-gui</url>
+  <url type="bugtracker">https://github.com/fananly233/pi-gui/issues</url>
   <launchable type="desktop-id">com.pi.gui.desktop</launchable>
   <description>
     <p>

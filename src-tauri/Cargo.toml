@@ -3,6 +3,9 @@ name = "pi-gui"
 version = "0.1.0"
 description = "Pi GUI - A Tauri desktop client for the Pi coding agent"
 authors = ["Pi GUI contributors"]
+license = "MIT"
+homepage = "https://github.com/fananly233/pi-gui"
+repository = "https://github.com/fananly233/pi-gui"
 edition = "2021"
 
 [lib]

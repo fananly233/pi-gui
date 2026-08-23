@@ -6,10 +6,10 @@ Pi GUI is an independently modified derivative of Gustav Pi Desktop with selecte
 
 ## Repository status
 
-The `0.1.0` candidate does not yet have an independent public `origin`. Do not clone or file Pi GUI issues against either donor repository. Once the independent repository is connected, replace the placeholder below with its URL:
+The independent project repository is [fananly233/pi-gui](https://github.com/fananly233/pi-gui). Do not file Pi GUI issues against either donor repository.
 
 ```powershell
-git clone <Pi GUI repository URL>
+git clone https://github.com/fananly233/pi-gui.git
 cd pi-gui
 npm ci
 npm run tauri dev
