@@ -10,6 +10,7 @@ import {
 } from "../models/model-state";
 import { normalizePiCommands, type PiCommandInfo } from "./ecosystem";
 import type { JsonObject } from "./event-normalizer";
+import { PI_RPC_REQUEST_TIMEOUT_MS, waitForPiRpcReady } from "./rpc-readiness";
 
 export type StreamingBehavior = "steer" | "followUp";
 
@@ -101,6 +102,7 @@ export class PiAdapter {
 	private currentGeneration: number | null = null;
 	private connected = false;
 	private starting = false;
+	private startupInFlight = false;
 	private buffered: BufferedEnvelope[] = [];
 	private subscribers = new Set<(event: PiAdapterEvent) => void>();
 	private pending = new Map<string, PendingRequest>();
@@ -125,12 +127,14 @@ export class PiAdapter {
 	}
 
 	async start(options: PiStartOptions): Promise<RpcStartResult> {
-		if (this.starting) throw new Error("Pi RPC is already starting.");
-		await this.ensureListeners();
-		this.starting = true;
-		this.buffered = [];
+		if (this.startupInFlight) throw new Error("Pi RPC is already starting.");
+		this.startupInFlight = true;
+		let spawned = false;
 
 		try {
+			await this.ensureListeners();
+			this.starting = true;
+			this.buffered = [];
 			const result = await invoke<RpcStartResult>("rpc_start", {
 				options: {
 					cwd: options.cwd,
@@ -140,6 +144,7 @@ export class PiAdapter {
 				instanceId: this.instanceId,
 			});
 
+			spawned = true;
 			this.currentGeneration = result.generation;
 			this.connected = true;
 			this.starting = false;
@@ -147,12 +152,18 @@ export class PiAdapter {
 			this.buffered = [];
 			for (const envelope of buffered) this.processEnvelope(envelope);
 			if (!this.connected) throw new Error("Pi RPC exited during startup.");
+			await waitForPiRpcReady((command, timeoutMs) => this.request(command, timeoutMs));
 			return result;
 		} catch (error) {
 			this.starting = false;
 			this.buffered = [];
 			this.connected = false;
+			this.rejectPending("Pi RPC startup failed.");
+			if (spawned) await invoke("rpc_stop", { instanceId: this.instanceId }).catch(() => undefined);
+			this.currentGeneration = null;
 			throw error;
+		} finally {
+			this.startupInFlight = false;
 		}
 	}
 
@@ -326,7 +337,7 @@ export class PiAdapter {
 		this.emit({ type: "rpc_event", event });
 	}
 
-	private async request<T = void>(command: JsonObject): Promise<T> {
+	private async request<T = void>(command: JsonObject, timeoutMs = PI_RPC_REQUEST_TIMEOUT_MS): Promise<T> {
 		if (!this.connected) throw new Error("Connect Pi before sending a command.");
 		await this.ensureListeners();
 		const id = `gui-${++this.requestSequence}`;
@@ -337,7 +348,7 @@ export class PiAdapter {
 			const timeout = setTimeout(() => {
 				this.pending.delete(id);
 				reject(new Error(`Timed out waiting for Pi to accept ${String(command.type)}.`));
-			}, 35_000);
+			}, timeoutMs);
 			this.pending.set(id, { resolve, reject, timeout });
 			invoke("rpc_send", { command: line, instanceId: this.instanceId }).catch((error) => {
 				clearTimeout(timeout);

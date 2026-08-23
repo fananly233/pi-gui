@@ -12,9 +12,9 @@ Pi GUI is a derivative of [Gustav Pi Desktop](https://github.com/gustavonline/pi
 
 ## Artifacts
 
-- macOS: `.dmg`, `.app.tar.gz`
 - Windows: signed NSIS `setup.exe`, signed `.msi`
-- Linux: `.AppImage`, `.deb`
+
+Pi GUI `0.1.0` is a Windows-only binary release. macOS and Linux remain source-build targets without supported `0.1.0` release assets.
 
 ## Release gates
 
@@ -27,8 +27,7 @@ Pi GUI is a derivative of [Gustav Pi Desktop](https://github.com/gustavonline/pi
 - [ ] Cross-version Windows upgrade passes, or this is the first Pi GUI release and is marked N/A.
 - [ ] Windows NSIS and MSI signatures are `Valid`.
 - [ ] Windows signer subject and trusted timestamp match the reviewed release configuration.
-- [ ] macOS signing and notarization pass.
-- [ ] Signed release smoke passes on Windows, macOS, and Linux.
+- [ ] Signed release smoke passes on Windows.
 - [ ] Known issues and installation network requirements are documented.
 - [ ] Private vulnerability reporting is enabled for the independent repository.
 

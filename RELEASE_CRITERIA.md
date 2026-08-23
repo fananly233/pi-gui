@@ -2,7 +2,9 @@
 
 Last updated: 2026-08-23.
 
-Pi GUI `0.1.0` is an unpublished derivative release candidate. A local build or unsigned installer is not a public release.
+Pi GUI `0.1.0` is an unpublished Windows-only binary release candidate. macOS and Linux remain source-build targets but do not have supported `0.1.0` release assets. A local build or unsigned installer is not a public release.
+
+The current local RC stabilization record is maintained in [docs/RC_ACCEPTANCE.md](./docs/RC_ACCEPTANCE.md). It does not replace signed-release or clean-machine evidence.
 
 ## 1. Identity and documentation gate
 
@@ -11,7 +13,7 @@ Pi GUI `0.1.0` is an unpublished derivative release candidate. A local build or 
 - [x] README, release notes, license, and `THIRD_PARTY_NOTICES.md` retain Gustav and DLYZZT attribution.
 - [x] No document presents donor releases, branches, issue numbers, or smoke results as Pi GUI evidence.
 - [x] The public repository URL and private security-reporting route are configured.
-- [ ] Branding/icon naming is reviewed for the Pi GUI identity.
+- [x] Branding/icon naming is reviewed for the Pi GUI identity.
 
 ## 2. Pre-push privacy gate
 
@@ -56,6 +58,8 @@ npm run gate:runtime-real
 
 Record Pi version, operating system, date, and any intentionally isolated state. These gates exercise real Pi/runtime behavior; they are not deterministic unit tests.
 
+The RPC, session, model, ecosystem, and managed-runtime gates must keep mutable Pi state in disposable directories and verify that the real Pi configuration remains unchanged.
+
 ## 5. Local bundle gate
 
 - [x] Build the current Windows bundles from the locked graph.
@@ -83,10 +87,9 @@ Do not use the development machine or an administratively extracted EXE as clean
 ## 7. Signed release gate
 
 - [ ] Windows NSIS and MSI have valid Authenticode signatures.
-- [ ] macOS app and DMG are signed and notarized.
-- [ ] Linux package contents and metadata pass smoke checks.
-- [ ] `.github/workflows/release.yml` creates a draft only.
-- [ ] `.github/workflows/release-smoke.yml` passes against the exact draft assets.
+- [x] macOS and Linux binary assets are explicitly out of scope for `0.1.0`; no unsupported artifacts are attached to its draft.
+- [x] `.github/workflows/release.yml` creates or updates a draft only after both declared Windows artifacts pass release verification.
+- [ ] `.github/workflows/release-smoke.yml` passes against the exact signed Windows draft assets.
 - [ ] Release notes include lineage, known limitations, install network requirements, and verification links.
 
 ## 8. Publish decision

@@ -1,4 +1,4 @@
-name: Signed Release Candidate
+name: Signed Windows Release Candidate
 
 on:
   push:
@@ -50,26 +50,9 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   bundle-and-verify:
-    name: Build and verify (${{ matrix.os_name }})
+    name: Build and verify Windows
     needs: validate-release
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: macos-latest
-            args: "--bundles app,dmg"
-            os_name: "macOS"
-            artifact_name: "pi-gui-release-macos"
-          - platform: windows-latest
-            args: "--bundles nsis,msi --config src-tauri/tauri.release.windows.conf.json"
-            os_name: "Windows"
-            artifact_name: "pi-gui-release-windows"
-          - platform: ubuntu-22.04
-            args: "--bundles appimage,deb"
-            os_name: "Linux"
-            artifact_name: "pi-gui-release-linux"
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: windows-latest
 
     steps:
       - name: Checkout exact tag
@@ -89,42 +72,10 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
-      - name: Install Linux dependencies (Tauri)
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libsoup-3.0-dev \
-            libgtk-3-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
-            patchelf
-
       - name: Install dependencies
         run: npm ci
 
-      - name: Require macOS signing and notarization credentials
-        if: matrix.platform == 'macos-latest'
-        shell: bash
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          set -euo pipefail
-          for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
-            if [[ -z "${!name:-}" ]]; then
-              echo "Missing required GitHub Actions secret: $name" >&2
-              exit 1
-            fi
-          done
-
       - name: Require Windows signing configuration
-        if: matrix.platform == 'windows-latest'
         shell: pwsh
         env:
           WINDOWS_SIGNING_MODE: ${{ vars.WINDOWS_SIGNING_MODE }}
@@ -166,7 +117,6 @@ jobs:
           npm audit
 
       - name: Import Windows PFX and create runner-only Tauri config
-        if: matrix.platform == 'windows-latest'
         shell: pwsh
         env:
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
@@ -222,25 +172,9 @@ jobs:
           }
 
       - name: Build signed Windows bundles
-        if: matrix.platform == 'windows-latest'
-        run: npm run tauri -- build ${{ matrix.args }}
-
-      - name: Build signed macOS bundles
-        if: matrix.platform == 'macos-latest'
-        env:
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: npm run tauri -- build ${{ matrix.args }}
-
-      - name: Build Linux bundles
-        if: matrix.platform == 'ubuntu-22.04'
-        run: npm run tauri -- build ${{ matrix.args }}
+        run: npm run tauri -- build --bundles nsis,msi --config src-tauri/tauri.release.windows.conf.json
 
       - name: Verify and stage Windows signatures
-        if: matrix.platform == 'windows-latest'
         shell: pwsh
         env:
           WINDOWS_EXPECTED_SIGNER_SUBJECT: ${{ vars.WINDOWS_EXPECTED_SIGNER_SUBJECT }}
@@ -271,59 +205,16 @@ jobs:
           New-Item -ItemType Directory -Path $staging -Force | Out-Null
           $installers | Copy-Item -Destination $staging
 
-      - name: Verify and stage macOS signing and notarization
-        if: matrix.platform == 'macos-latest'
-        shell: bash
-        run: |
-          set -euo pipefail
-          APP_PATH="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' -type d -print -quit)"
-          DMG_PATH="$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -type f -print -quit)"
-          test -d "$APP_PATH"
-          test -s "$DMG_PATH"
-          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-          spctl --assess --type execute --verbose=2 "$APP_PATH"
-          xcrun stapler validate "$APP_PATH"
-          xcrun stapler validate "$DMG_PATH"
-
-          STAGING="$RUNNER_TEMP/pi-gui-release"
-          mkdir -p "$STAGING"
-          cp "$DMG_PATH" "$STAGING/"
-          tar -czf "$STAGING/Pi.GUI.app.tar.gz" -C "$(dirname "$APP_PATH")" "$(basename "$APP_PATH")"
-
-      - name: Verify and stage Linux packages
-        if: matrix.platform == 'ubuntu-22.04'
-        shell: bash
-        run: |
-          set -euo pipefail
-          APPIMAGE="$(find src-tauri/target/release/bundle/appimage -maxdepth 1 -name '*.AppImage' -type f -print -quit)"
-          DEB="$(find src-tauri/target/release/bundle/deb -maxdepth 1 -name '*.deb' -type f -print -quit)"
-          test -s "$APPIMAGE"
-          test -s "$DEB"
-          dpkg-deb --info "$DEB"
-          dpkg-deb --contents "$DEB" | tee deb-contents.txt
-          grep -q "usr/share/metainfo/com.pi.gui.metainfo.xml" deb-contents.txt
-          grep -q "usr/bin/pi-gui" deb-contents.txt
-
-          chmod +x "$APPIMAGE"
-          "$APPIMAGE" --appimage-extract > /dev/null
-          test -f squashfs-root/AppRun
-          test -f squashfs-root/usr/share/metainfo/com.pi.gui.metainfo.xml
-          test -f squashfs-root/usr/bin/pi-gui
-
-          STAGING="$RUNNER_TEMP/pi-gui-release"
-          mkdir -p "$STAGING"
-          cp "$APPIMAGE" "$DEB" "$STAGING/"
-
       - name: Upload verified release assets
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: pi-gui-release-windows
           if-no-files-found: error
           retention-days: 7
           path: ${{ runner.temp }}/pi-gui-release/*
 
       - name: Remove imported Windows certificate
-        if: matrix.platform == 'windows-latest' && always()
+        if: always()
         shell: pwsh
         run: |
           foreach ($thumbprint in ($env:PI_GUI_WINDOWS_IMPORTED_THUMBPRINTS -split ",")) {
@@ -349,20 +240,15 @@ jobs:
       - name: Download verified assets
         uses: actions/download-artifact@v5
         with:
-          pattern: pi-gui-release-*
-          merge-multiple: true
+          name: pi-gui-release-windows
           path: release-assets
 
       - name: Require complete artifact set
         shell: bash
         run: |
           set -euo pipefail
-          test "$(find release-assets -maxdepth 1 -name '*.dmg' -type f | wc -l)" -eq 1
-          test "$(find release-assets -maxdepth 1 -name '*.app.tar.gz' -type f | wc -l)" -eq 1
           test "$(find release-assets -maxdepth 1 -name '*setup.exe' -type f | wc -l)" -eq 1
           test "$(find release-assets -maxdepth 1 -name '*.msi' -type f | wc -l)" -eq 1
-          test "$(find release-assets -maxdepth 1 -name '*.AppImage' -type f | wc -l)" -eq 1
-          test "$(find release-assets -maxdepth 1 -name '*.deb' -type f | wc -l)" -eq 1
 
       - name: Create or update draft
         shell: bash

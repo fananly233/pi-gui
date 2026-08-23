@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { desktopApi } from "../api/desktop-api";
 import { FileExplorer } from "./FileExplorer";
 import { FileViewer } from "./FileViewer";
 
@@ -26,13 +27,13 @@ export function FilesPanel({ workspaceRoot, selectedPath, onSelectPath, onMentio
 		setDirty(value);
 		onDirtyStateChange(value);
 	}, [onDirtyStateChange]);
-	const close = () => {
-		if (!dirty || window.confirm("Discard unsaved file changes and close the Files panel?")) onClose();
+	const close = async () => {
+		if (!dirty || await desktopApi.confirmAction("Discard unsaved file changes and close the Files panel?", "Discard")) onClose();
 	};
 
 	return (
 		<aside className="workspace-tool-panel files-panel" aria-label="Project files">
-			<button type="button" className="files-panel__close" onClick={close} title="Close files panel">×</button>
+			<button type="button" className="files-panel__close" onClick={() => void close()} title="Close files panel">×</button>
 			{!workspaceRoot ? (
 				<div className="file-surface__empty">
 					<h3>Connect a workspace</h3>

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import type { DesktopRuntimeInfo } from "../api/desktop-api";
+import { desktopApi, type DesktopRuntimeInfo } from "../api/desktop-api";
 import type { PiChatController } from "../hooks/usePiChat";
 import { applyTheme, readStoredTheme, storeTheme, type Theme } from "../theme";
 import { ChatWindow } from "./ChatWindow";
@@ -73,15 +73,15 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 
 	const onFilesDirtyChange = useCallback((dirty: boolean) => setFilesDirty(dirty), []);
 
-	const toggleTool = (tool: WorkspaceTool) => {
+	const toggleTool = async (tool: WorkspaceTool) => {
 		const nextTool = activeTool === tool ? null : tool;
 		if (activeTool === "files" && filesDirty && nextTool !== "files"
-			&& !window.confirm("Discard unsaved file changes and leave the Files panel?")) return;
+			&& !await desktopApi.confirmAction("Discard unsaved file changes and leave the Files panel?", "Discard")) return;
 		setActiveTool(nextTool);
 	};
 
 	const useWorktree = async (path: string) => {
-		if (connected && !window.confirm("Disconnect the active Pi session and use this worktree as the workspace?")) return;
+		if (connected && !await desktopApi.confirmAction("Disconnect the active Pi session and use this worktree as the workspace?", "Use worktree")) return;
 		if (connected) await chat.disconnect();
 		onWorkspacePathChange(path);
 		setActiveTool(null);
@@ -156,7 +156,7 @@ export function AppShell({ runtimeState, onRetryRuntime, workspacePath, onWorksp
 
 					<div className={`sidebar__runtime sidebar__runtime--${runtimeState.status}`}>
 						<span className={`status-dot status-dot--${runtimeState.status}`} aria-hidden="true" />
-						<RuntimePanel state={runtimeState} onRetry={onRetryRuntime} onOpen={() => toggleTool("runtime")} />
+						<RuntimePanel state={runtimeState} onRetry={onRetryRuntime} onOpen={() => void toggleTool("runtime")} />
 					</div>
 				</aside>
 

@@ -83,13 +83,13 @@ export function FileViewer({ workspaceRoot, path, onBack, onMentionFile, canMent
 	};
 
 	const name = path.split("/").at(-1) ?? path;
-	const back = () => {
-		if (!dirty || window.confirm("Discard unsaved changes and return to the file list?")) onBack();
+	const back = async () => {
+		if (!dirty || await desktopApi.confirmAction("Discard unsaved changes and return to the file list?", "Discard")) onBack();
 	};
 	return (
 		<section className="file-viewer" aria-label={`File ${path}`}>
 			<header className="file-surface__header file-viewer__header">
-				<button type="button" className="icon-button" onClick={back} title="Back to files">←</button>
+				<button type="button" className="icon-button" onClick={() => void back()} title="Back to files">←</button>
 				<div>
 					<p className="eyebrow" title={path}>{path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "Workspace"}</p>
 					<strong>{name}</strong>

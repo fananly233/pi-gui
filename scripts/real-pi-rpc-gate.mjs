@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { EventNormalizer } from "../src/pi/event-normalizer.ts";
+import {
+	createIsolatedPiEnvironment,
+	isolatedDiscoveryArgs,
+	requestRealPiStartupState,
+} from "./real-pi-gate-environment.mjs";
 
 const provider = process.env.PI_GUI_GATE_PROVIDER || "deepseek";
 const model = process.env.PI_GUI_GATE_MODEL || "deepseek-v4-flash";
@@ -16,7 +21,8 @@ function delay(milliseconds) {
 }
 
 class RealPiHarness {
-	constructor() {
+	constructor(environment) {
+		this.environment = environment;
 		this.child = null;
 		this.stdoutBuffer = "";
 		this.stderr = "";
@@ -31,13 +37,13 @@ class RealPiHarness {
 	}
 
 	start() {
-		const piArgs = ["--mode", "rpc", "--no-session", "--provider", provider, "--model", model];
+		const piArgs = ["--mode", "rpc", "--no-session", "--provider", provider, "--model", model, ...isolatedDiscoveryArgs];
 		const command = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "pi";
 		const args = process.platform === "win32" ? ["/d", "/s", "/c", "pi.cmd", ...piArgs] : piArgs;
 
 		this.child = spawn(command, args, {
 			cwd,
-			env: { ...process.env, NO_COLOR: "1" },
+			env: this.environment,
 			stdio: ["pipe", "pipe", "pipe"],
 			windowsHide: true,
 		});
@@ -162,18 +168,21 @@ class RealPiHarness {
 	}
 }
 
-const harness = new RealPiHarness();
+const isolatedPi = await createIsolatedPiEnvironment("pi-gui-phase9-rpc-");
+const harness = new RealPiHarness(isolatedPi.environment);
 
 try {
 	console.log(`[gate] starting real Pi RPC with ${provider}/${model}`);
 	harness.start();
-	const stateResponse = await harness.request({ type: "get_state" });
+	const stateResponse = await requestRealPiStartupState(harness);
 	assert.equal(stateResponse.data?.model?.provider, provider);
 	assert.equal(stateResponse.data?.model?.id, model);
-	await harness.request({ type: "set_thinking_level", level: "low" });
+	await harness.request({ type: "set_thinking_level", level: "high" });
 	console.log("[gate] startup and correlated responses: PASS");
 
-	const firstRun = await harness.promptAndSettle("Reply with exactly PI_GUI_FIRST_OK. Do not use tools.");
+	const firstRun = await harness.promptAndSettle(
+		"Without using tools, reason through whether 173 multiplied by 29 is greater than 5000, then reply with exactly PI_GUI_FIRST_OK.",
+	);
 	const firstText = firstRun.normalized
 		.filter((event) => event.type === "assistant_reconciled")
 		.map((event) => event.text)
@@ -239,5 +248,9 @@ try {
 	if (harness.stderr.trim()) console.error(`[gate] pi stderr:\n${harness.stderr.trim().slice(-4000)}`);
 	process.exitCode = 1;
 } finally {
-	await harness.stop();
+	try {
+		await harness.stop();
+	} finally {
+		await isolatedPi.dispose();
+	}
 }

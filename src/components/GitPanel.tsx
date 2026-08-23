@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { desktopApi, type GitDiffResult, type GitWorkspaceStatus, type GitWorktree } from "../api/desktop-api";
 
 type GitPanelProps = {
@@ -32,6 +32,7 @@ function DiffBlock({ title, diff }: { title: string; diff: GitDiffResult | null 
 }
 
 export function GitPanel({ workspaceRoot, onClose, onUseWorkspace }: GitPanelProps) {
+	const mutationLock = useRef(false);
 	const [status, setStatus] = useState<GitWorkspaceStatus | null>(null);
 	const [worktrees, setWorktrees] = useState<GitWorktree[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -75,6 +76,21 @@ export function GitPanel({ workspaceRoot, onClose, onUseWorkspace }: GitPanelPro
 		void refresh();
 	}, [refresh]);
 
+	const runMutation = async (operation: () => Promise<void>) => {
+		if (mutationLock.current) return;
+		mutationLock.current = true;
+		setMutating(true);
+		setError(null);
+		try {
+			await operation();
+		} catch (nextError) {
+			setError(describeError(nextError));
+		} finally {
+			mutationLock.current = false;
+			setMutating(false);
+		}
+	};
+
 	const loadDiff = async (path: string) => {
 		if (!workspaceRoot) return;
 		setSelectedPath(path);
@@ -97,45 +113,27 @@ export function GitPanel({ workspaceRoot, onClose, onUseWorkspace }: GitPanelPro
 	const submitWorktree = async (event: FormEvent) => {
 		event.preventDefault();
 		if (!workspaceRoot || !branch.trim()) return;
-		setMutating(true);
-		setError(null);
-		try {
+		await runMutation(async () => {
 			await desktopApi.createGitWorktree(workspaceRoot, branch.trim(), createBranch);
 			setBranch("");
 			await refresh();
-		} catch (nextError) {
-			setError(describeError(nextError));
-		} finally {
-			setMutating(false);
-		}
+		});
 	};
 
 	const removeWorktree = async (worktree: GitWorktree) => {
 		if (!workspaceRoot || !canRemove(worktree)) return;
-		if (!window.confirm(`Remove this clean Git worktree?\n\n${worktree.path}`)) return;
-		setMutating(true);
-		setError(null);
-		try {
+		await runMutation(async () => {
+			if (!await desktopApi.confirmAction(`Remove this clean Git worktree?\n\n${worktree.path}`, "Remove")) return;
 			await desktopApi.removeGitWorktree(workspaceRoot, worktree.path);
 			await refresh();
-		} catch (nextError) {
-			setError(describeError(nextError));
-		} finally {
-			setMutating(false);
-		}
+		});
 	};
 
 	const useWorktree = async (worktree: GitWorktree) => {
 		if (worktree.isCurrent || mutating) return;
-		setMutating(true);
-		setError(null);
-		try {
+		await runMutation(async () => {
 			await onUseWorkspace(worktree.path);
-		} catch (nextError) {
-			setError(describeError(nextError));
-		} finally {
-			setMutating(false);
-		}
+		});
 	};
 
 	return (

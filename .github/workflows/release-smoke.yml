@@ -1,4 +1,4 @@
-name: Signed Release Smoke
+name: Signed Windows Release Smoke
 
 on:
   workflow_dispatch:
@@ -17,54 +17,6 @@ permissions:
   contents: read
 
 jobs:
-  smoke-macos:
-    name: Verify macOS artifacts
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout release source
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ inputs.tag }}
-
-      - name: Download release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p smoke-assets
-          gh release download "${{ inputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --pattern "*.dmg" \
-            --pattern "*.app.tar.gz" \
-            --dir smoke-assets
-
-      - name: Verify bundle, signature, and archive
-        run: |
-          set -euo pipefail
-          DMG="$(find smoke-assets -maxdepth 1 -name '*.dmg' -print -quit)"
-          APP_TAR="$(find smoke-assets -maxdepth 1 -name '*.app.tar.gz' -print -quit)"
-          test -s "$DMG"
-          test -s "$APP_TAR"
-
-          MOUNT_DIR="$(mktemp -d /tmp/pi-gui-smoke.XXXXXX)"
-          trap 'hdiutil detach "$MOUNT_DIR" -quiet 2>/dev/null || true; rm -rf "$MOUNT_DIR"' EXIT
-          hdiutil attach "$DMG" -nobrowse -quiet -mountpoint "$MOUNT_DIR"
-          APP_PATH="$MOUNT_DIR/Pi GUI.app"
-          test -f "$APP_PATH/Contents/MacOS/pi-gui"
-          codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-          spctl --assess --type execute --verbose=2 "$APP_PATH"
-          xcrun stapler validate "$APP_PATH"
-          xcrun stapler validate "$DMG"
-          hdiutil detach "$MOUNT_DIR" -quiet
-
-          mkdir smoke-macos-unpacked
-          tar -xzf "$APP_TAR" -C smoke-macos-unpacked
-          ARCHIVE_APP="$(find smoke-macos-unpacked -maxdepth 2 -name 'Pi GUI.app' -type d -print -quit)"
-          test -f "$ARCHIVE_APP/Contents/MacOS/pi-gui"
-          codesign --verify --deep --strict --verbose=2 "$ARCHIVE_APP"
-          spctl --assess --type execute --verbose=2 "$ARCHIVE_APP"
-          xcrun stapler validate "$ARCHIVE_APP"
-
   smoke-windows:
     name: Install, launch, update, and uninstall on Windows
     runs-on: windows-latest
@@ -154,45 +106,3 @@ jobs:
             $arguments.PreviousInstallerPath = (Get-ChildItem previous-assets -Filter "*setup.exe" | Select-Object -First 1).FullName
           }
           ./scripts/windows-installer-smoke.ps1 @arguments
-
-  smoke-linux:
-    name: Verify Linux artifacts
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: Checkout release source
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ inputs.tag }}
-
-      - name: Download release assets
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          mkdir -p smoke-assets
-          gh release download "${{ inputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --pattern "*.AppImage" \
-            --pattern "*.deb" \
-            --dir smoke-assets
-
-      - name: Verify DEB contents
-        run: |
-          set -euo pipefail
-          DEB="$(find smoke-assets -maxdepth 1 -name '*.deb' -print -quit)"
-          test -s "$DEB"
-          dpkg-deb --info "$DEB"
-          dpkg-deb --contents "$DEB" | tee deb-contents.txt
-          grep -q "usr/share/metainfo/com.pi.gui.metainfo.xml" deb-contents.txt
-          grep -q "usr/bin/pi-gui" deb-contents.txt
-
-      - name: Verify AppImage contents
-        run: |
-          set -euo pipefail
-          APPIMAGE="$(find smoke-assets -maxdepth 1 -name '*.AppImage' -print -quit)"
-          test -s "$APPIMAGE"
-          chmod +x "$APPIMAGE"
-          "$APPIMAGE" --appimage-extract > /dev/null
-          test -f squashfs-root/AppRun
-          test -f squashfs-root/usr/share/metainfo/com.pi.gui.metainfo.xml
-          test -f squashfs-root/usr/bin/pi-gui

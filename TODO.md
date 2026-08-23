@@ -17,8 +17,12 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Confirm the local migration prompt is ignored and never entered Git history.
 - [x] Confirm current `HEAD` history has no common key/token/private-key/credential-URL pattern hits.
 - [x] With explicit maintainer approval, rewrite all 26 post-fork commits to the public GitHub identity and noreply author/committer email without changing source trees, subjects, dates, or topology.
-- [x] Pass `npm run check:publish` across 144 tracked/non-ignored candidate files.
-- [x] Diagnose and harden the Windows PTY timeout: the test now waits for cold PowerShell to emit DSR before replying with CPR, covers the `cmd.exe` fallback, and the final serial suite passes 24 tests with one network gate ignored.
+- [x] Pass `npm run check:publish` across 150 tracked/non-ignored candidate files after the Phase 9 source and documentation additions.
+- [x] Diagnose and harden the Windows PTY timeout: the test now waits for cold PowerShell to emit DSR before replying with CPR, covers the `cmd.exe` fallback, and the current serial suite passes 25 tests with one network gate ignored.
+- [x] Isolate mutable auth/settings/models/session state in all five real-Pi/runtime gates and verify the real Pi files remain unchanged.
+- [x] Give isolated real-Pi gates the same five-minute startup-readiness budget as the desktop when Pi installs configured packages before consuming RPC input.
+- [x] Complete the local native Phase 9 matrix for chat, sessions, files, models/auth, PTY, Git/worktrees, ecosystem, runtime, themes, windows, and child-process cleanup.
+- [x] Replace unsafe WebView confirmations, add an RPC readiness handshake, refresh models on ready transitions, and isolate native app/WebView data during acceptance tests.
 
 ## Blocking before first public push
 
@@ -36,10 +40,11 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Harden the real-PTY test to wait for the observed DSR before replying, cover the Windows `cmd.exe` fallback, and prove both paths across six independent test-process runs.
 - [x] Re-run **Windows Clean-Machine Candidate** from the independent repository against signed-release hardening commit `03d064b`.
 - [x] Record successful install, launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation evidence.
+- [x] Re-run CI and **Windows Clean-Machine Candidate** for Phase 9 runtime/source commit `867ac37`; both passed on fresh GitHub-hosted runners.
+- [x] Lock `0.1.0` to signed Windows NSIS/MSI release assets; macOS and Linux remain unsupported source-build targets for this version.
 - [ ] Configure Windows Authenticode signing for NSIS and MSI.
-- [ ] Configure macOS signing and notarization.
 - [ ] Build a draft release from the intended tag.
-- [ ] Run **Signed Release Smoke** against the exact draft assets.
+- [ ] Run **Signed Windows Release Smoke** against the exact draft assets.
 - [x] Record the candidate commit, workflow URLs, unsigned status, local hashes, hosted artifact, and known limitations in `docs/RELEASES.md`.
 - [ ] Publish only after every required release criterion passes.
 

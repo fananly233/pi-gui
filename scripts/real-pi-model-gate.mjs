@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import {
+	createIsolatedPiEnvironment,
+	isolatedDiscoveryArgs,
+	requestRealPiStartupState,
+} from "./real-pi-gate-environment.mjs";
 
 const provider = process.env.PI_GUI_GATE_PROVIDER || "deepseek";
 const model = process.env.PI_GUI_GATE_MODEL || "deepseek-v4-flash";
@@ -15,8 +20,9 @@ function delay(milliseconds) {
 }
 
 class ModelPiHarness {
-	constructor(label) {
+	constructor(label, environment) {
 		this.label = label;
+		this.environment = environment;
 		this.child = null;
 		this.stdoutBuffer = "";
 		this.stderr = "";
@@ -28,12 +34,12 @@ class ModelPiHarness {
 	}
 
 	start() {
-		const piArgs = ["--mode", "rpc", "--no-session", "--provider", provider, "--model", model];
+		const piArgs = ["--mode", "rpc", "--no-session", "--provider", provider, "--model", model, ...isolatedDiscoveryArgs];
 		const command = process.platform === "win32" ? (process.env.ComSpec || "cmd.exe") : "pi";
 		const args = process.platform === "win32" ? ["/d", "/s", "/c", "pi.cmd", ...piArgs] : piArgs;
 		this.child = spawn(command, args, {
 			cwd,
-			env: { ...process.env, NO_COLOR: "1" },
+			env: this.environment,
 			stdio: ["pipe", "pipe", "pipe"],
 			windowsHide: true,
 		});
@@ -122,14 +128,15 @@ class ModelPiHarness {
 	}
 }
 
-const first = new ModelPiHarness("models-first");
+const isolatedPi = await createIsolatedPiEnvironment("pi-gui-phase9-models-");
+const first = new ModelPiHarness("models-first", isolatedPi.environment);
 let initialState = null;
 let restored = false;
 
 try {
 	console.log(`[gate] starting real Pi model RPC with ${provider}/${model}`);
 	first.start();
-	initialState = (await first.request({ type: "get_state" })).data;
+	initialState = (await requestRealPiStartupState(first)).data;
 	assert.equal(initialState?.model?.provider, provider);
 	assert.equal(initialState?.model?.id, model);
 
@@ -166,10 +173,10 @@ try {
 	console.log(`[gate] thinking levels (${levels.join(", ")}) and restoration: PASS`);
 	await first.stop();
 
-	const restarted = new ModelPiHarness("models-restart");
+	const restarted = new ModelPiHarness("models-restart", isolatedPi.environment);
 	try {
 		restarted.start();
-		const restartedState = (await restarted.request({ type: "get_state" })).data;
+		const restartedState = (await requestRealPiStartupState(restarted)).data;
 		assert.equal(restartedState?.model?.provider, provider);
 		assert.equal(restartedState?.model?.id, model);
 		console.log("[gate] clean Pi process restart with requested model: PASS");
@@ -190,5 +197,9 @@ try {
 			// The process may already have exited; shutdown still runs below.
 		}
 	}
-	await first.stop();
+	try {
+		await first.stop();
+	} finally {
+		await isolatedPi.dispose();
+	}
 }
