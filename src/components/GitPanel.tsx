@@ -112,7 +112,7 @@ export function GitPanel({ workspaceRoot, onClose, onUseWorkspace }: GitPanelPro
 
 	const removeWorktree = async (worktree: GitWorktree) => {
 		if (!workspaceRoot || !canRemove(worktree)) return;
-		if (!window.confirm(`Remove this clean Git worktree?\n\n${worktree.path}`)) return;
+		if (!await desktopApi.confirmAction(`Remove this clean Git worktree?\n\n${worktree.path}`, "Remove")) return;
 		setMutating(true);
 		setError(null);
 		try {

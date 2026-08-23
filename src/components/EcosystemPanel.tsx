@@ -130,8 +130,9 @@ export function EcosystemPanel({ workspaceRoot, sessionReady, loadCommands, onUs
 		const trustNote = scope === "project"
 			? "\n\nProject scope asks Pi to trust this project's local package configuration for this command."
 			: "";
-		if (!window.confirm(
+		if (!await desktopApi.confirmAction(
 			`Install this ${scope} Pi package?\n\n${source.trim()}\n\nPi packages run with full system access. Review the source before continuing.${trustNote}`,
+			"Install",
 		)) return;
 		const installed = await finishMutation(
 			() => desktopApi.installPiPackage(workspaceRoot, source.trim(), scope),
@@ -148,7 +149,7 @@ export function EcosystemPanel({ workspaceRoot, sessionReady, loadCommands, onUs
 		const trustNote = entry.scope === "project"
 			? "\n\nPi will trust project-local package configuration for this removal command."
 			: "";
-		if (!window.confirm(`Remove this ${entry.scope} Pi package?\n\n${entry.source}${trustNote}`)) return;
+		if (!await desktopApi.confirmAction(`Remove this ${entry.scope} Pi package?\n\n${entry.source}${trustNote}`, "Remove")) return;
 		await finishMutation(
 			() => desktopApi.removePiPackage(workspaceRoot, entry.source, entry.scope),
 			entry.scope === "project" || includeProjectPackages,
@@ -157,17 +158,18 @@ export function EcosystemPanel({ workspaceRoot, sessionReady, loadCommands, onUs
 
 	const updateAll = async () => {
 		if (!workspaceRoot || mutating || packages.length === 0) return;
-		if (!window.confirm("Ask Pi to update all trusted, unpinned packages?\n\nThis may download and execute third-party package code.")) return;
+		if (!await desktopApi.confirmAction("Ask Pi to update all trusted, unpinned packages?\n\nThis may download and execute third-party package code.", "Update")) return;
 		await finishMutation(
 			() => desktopApi.updatePiPackages(workspaceRoot, null, includeProjectPackages),
 			includeProjectPackages,
 		);
 	};
 
-	const showProjectPackages = () => {
+	const showProjectPackages = async () => {
 		if (!workspaceRoot) return;
-		if (!window.confirm(
+		if (!await desktopApi.confirmAction(
 			"Allow Pi to read this workspace's project package settings?\n\nThis list command does not run package resources, but project packages still have full system access when Pi loads them.",
+			"Allow",
 		)) return;
 		setApprovedProjectWorkspace(workspaceRoot);
 	};
@@ -198,7 +200,7 @@ export function EcosystemPanel({ workspaceRoot, sessionReady, loadCommands, onUs
 						<header>
 							<div><h3>Packages</h3><span>{packages.length}</span></div>
 							<div className="ecosystem-section__actions">
-								{!includeProjectPackages ? <button type="button" onClick={showProjectPackages} disabled={mutating || loading}>Show project</button> : null}
+								{!includeProjectPackages ? <button type="button" onClick={() => void showProjectPackages()} disabled={mutating || loading}>Show project</button> : null}
 								<button type="button" onClick={() => void updateAll()} disabled={mutating || loading || packages.length === 0}>Update all</button>
 							</div>
 						</header>

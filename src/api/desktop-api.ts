@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { confirm as confirmDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 
 export type DesktopRuntimeInfo = Readonly<{
 	platform: string;
@@ -366,6 +366,20 @@ function mapPiRuntimeStatus(status: NativePiRuntimeStatus): PiRuntimeStatus {
 }
 
 export const desktopApi = {
+	async confirmAction(message: string, okLabel = "Continue"): Promise<boolean> {
+		try {
+			return await confirmDialog(message, {
+				title: "Pi GUI",
+				kind: "warning",
+				okLabel,
+				cancelLabel: "Cancel",
+			});
+		} catch (error) {
+			console.error("Native confirmation dialog failed; action cancelled.", error);
+			return false;
+		}
+	},
+
 	getRuntimeInfo(): Promise<DesktopRuntimeInfo> {
 		return invoke<DesktopRuntimeInfo>("get_desktop_runtime_info");
 	},
