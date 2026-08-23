@@ -2,6 +2,8 @@
 
 This document defines how Pi GUI app icons are maintained and regenerated.
 
+> Release note: the source filename and current **Pi DESK** artwork are inherited from the Gustav base. They remain the build input for `0.1.0` development bundles, but final Pi GUI branding must be reviewed before a public release. Do not infer release readiness from regenerated icon files alone.
+
 ## Source of truth
 
 - Primary source artwork: `assets/branding/pi-desktop-icon.svg`

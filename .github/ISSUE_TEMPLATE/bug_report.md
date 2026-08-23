@@ -21,9 +21,9 @@ labels: ["type:bug"]
 ## Environment
 
 - OS: 
-- Pi GUI version:
-- Pi CLI version (`pi --version`): 
+- Pi GUI version/commit:
+- Pi runtime source (managed/system) and version:
 
 ## Logs / screenshots
 
-<!-- Attach relevant logs/screenshots -->
+<!-- Attach only redacted logs/screenshots. Remove credentials, prompts, model output, private paths, and repository content. -->

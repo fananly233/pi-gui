@@ -2,23 +2,30 @@
 
 ## Supported versions
 
-Security fixes are provided for the latest release line on `main`.
+Pi GUI `0.1.0` is an unpublished candidate. There is no supported public release line yet, and locally generated unsigned installers are not public release artifacts.
+
+This section will list supported versions after the independent repository, signing, and clean-machine release gates are operational.
 
 ## Reporting a vulnerability
 
-Please do **not** open public issues for security vulnerabilities.
+Do not open a public issue containing vulnerability details, credentials, private prompts, session files, or reproduction data from a private repository.
 
-Email: **hello@gustavonline.com**
+Before the first public release, the independent Pi GUI repository must enable GitHub private vulnerability reporting. Use that private channel once it is available. Pi GUI reports must not be sent to the Gustav or DLYZZT maintainers unless the issue is independently reproduced in their project.
 
-Include:
-- affected version/commit
-- reproduction steps
-- impact assessment
-- suggested remediation (if any)
+A useful report includes:
 
-We will acknowledge receipt and work on a fix as quickly as possible.
+- affected Pi GUI version or commit;
+- operating system and Pi runtime source/version;
+- minimal reproduction steps and impact;
+- redacted logs or screenshots;
+- suggested remediation, if known.
 
-## Security notes
+The project currently has no public security intake address. Publishing remains blocked until a private reporting channel is configured.
 
-Pi Desktop is a local runtime host and requires filesystem + process permissions to function.
-Review `src-tauri/capabilities/default.json` before production/enterprise deployment.
+## Security boundary
+
+Pi GUI is a local development runtime host and requires filesystem and process permissions. The renderer receives narrow Tauri commands rather than arbitrary shell, Git, runtime executable, environment, or filesystem access.
+
+Provider credentials remain owned by Pi. React receives provider/source/type metadata, not secret values. Lifecycle logs exclude prompts, model output, credentials, and environment variables.
+
+Review `docs/PERMISSIONS.md` and `src-tauri/capabilities/default.json` before production, enterprise, or restricted-environment deployment.

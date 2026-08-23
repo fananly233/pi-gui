@@ -1,62 +1,94 @@
-# Pi Desktop Release Criteria (V1)
+# Pi GUI 0.1 Release Criteria
 
-## Branch model
-- `main`: stable, releasable only.
-- `dev`: integration branch for validated work.
-- `feat/<issue-id>-<slug>`: one issue per branch.
+Last updated: 2026-08-23.
 
-## Issue model
-Every work item must have a GitHub issue with:
-- clear acceptance criteria
-- priority (`priority:p0` / `priority:p1`)
-- type (`type:bug` / `type:feature` / `type:roadmap`)
-- area (`area:rpc`, `area:ui`, `area:release`, etc.)
+Pi GUI `0.1.0` is an unpublished derivative release candidate. A local build or unsigned installer is not a public release.
 
-`TODO.md` should mirror only the **currently active issue** for the session.
+## 1. Identity and documentation gate
 
-## Per-issue workflow (required)
-1. Pick/open issue on GitHub.
-2. Create branch from `dev`:
-   - `git checkout dev && git pull`
-   - `git checkout -b feat/<issue-id>-<slug>`
-3. Implement only issue scope.
-4. Validate locally:
-   - `npm run check`
-   - `npm run build:frontend`
-   - `cargo check`
-   - smoke test affected UX flow in `npm run tauri dev`
-5. Update `TODO.md` to reflect issue completion state.
-6. Commit with message including issue id.
-7. Push branch and open PR into `dev`.
-8. Merge only after checks + manual smoke pass.
+- [ ] Product metadata agrees on `Pi GUI`, `pi-gui`, `com.pi.gui`, and the intended version/tag.
+- [ ] README explains the product, installation, first-use flow, current limitations, and privacy model.
+- [ ] README, release notes, license, and `THIRD_PARTY_NOTICES.md` retain Gustav and DLYZZT attribution.
+- [ ] No document presents donor releases, branches, issue numbers, or smoke results as Pi GUI evidence.
+- [ ] The public repository URL and private security-reporting route are configured.
+- [ ] Branding/icon naming is reviewed for the Pi GUI identity.
 
-## Dev -> Main promotion gate
-Promote `dev` to `main` only when:
-- no open P0 issues
-- all acceptance criteria for V1 scope are met
-- release smoke tests pass end-to-end
-- no known crash loops/disconnect regressions
+## 2. Pre-push privacy gate
 
-## V1 smoke tests (must pass)
-1. App starts once (no process/window spawn loop).
-2. Open project A, switch to project B, open sessions in both.
-3. Send prompt, verify stream + tool output + abort.
-4. Switch model and thinking level.
-5. Fork/history/export workflow works.
-6. Settings shows auth + CLI runtime info.
-7. CLI update check runs; update action behaves as expected for PATH installs.
-8. Command palette and key shortcuts operate correctly.
-9. Repeat assistant runs 3+ times: no duplicated streaming deltas; run exits streaming state; follow-up input uses normal prompt mode (not stuck in steer).
+- [ ] Repository-local Git name is an approved public identity.
+- [ ] Every post-fork author and committer email uses an approved GitHub noreply address.
+- [ ] `npm run check:publish` passes.
+- [ ] `git status --short`, `git diff --check`, and the staged diff are reviewed.
+- [ ] No `.env`, Pi auth/session data, local app data, signing material, logs, personal paths, or local orchestration notes are tracked.
+- [ ] Remote URLs contain no embedded credentials.
+- [ ] Only the reviewed Pi GUI branch is pushed. Never use `git push --all` or `git push --mirror`; `archive/electron-mvp` is a local donor-work archive.
 
-## Release cut checklist
-- [ ] `dev` fully green and smoke-tested
-- [ ] Merge `dev` -> `main`
-- [ ] Tag release candidate (`v0.x.y-rcX`) then stable (`v0.x.y`)
-- [ ] Publish release notes with known limitations
-  - [ ] If macOS build is unsigned, include: `xattr -cr /Applications/Pi\ Desktop.app`
-- [ ] If icons changed, regenerate/validate using `docs/ICONS.md`
-- [ ] Verify GitHub release artifacts:
-  - [ ] macOS (`.dmg` / `.app.tar.gz`)
-  - [ ] Windows (`.msi` / `nsis`)
-  - [ ] Linux (`.AppImage` / `.deb`)
-- [ ] Mark prerelease vs stable correctly
+Changing existing commit author/committer metadata rewrites commit hashes. It requires explicit approval and must happen before the first public push.
+
+## 3. Deterministic source gate
+
+```powershell
+$env:RELEASE_TAG = "v0.1.0"
+npm ci
+npm run check:release
+npm run check
+npm test
+npm run build:frontend
+cargo check --locked --manifest-path src-tauri/Cargo.toml
+cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
+npm audit
+git diff --check
+```
+
+All commands must pass. Existing warnings must be recorded exactly and must not be upgraded into a pass claim for a failed check.
+
+## 4. Real integration gate
+
+Run the gates relevant to the release environment:
+
+```powershell
+npm run gate:pi-real
+npm run gate:sessions-real
+npm run gate:models-real
+npm run gate:ecosystem-real
+npm run gate:runtime-real
+```
+
+Record Pi version, operating system, date, and any intentionally isolated state. These gates exercise real Pi/runtime behavior; they are not deterministic unit tests.
+
+## 5. Local bundle gate
+
+- [ ] Build expected platform bundles from the locked graph.
+- [ ] Inspect product name, identifier, version, installer scope, upgrade identity, downgrade policy, and bundled files.
+- [ ] Inspect every executable/installer signature.
+- [ ] Record artifact SHA-256 values.
+- [ ] Label extraction or local executable launch as local smoke only.
+
+On Windows, NSIS is the primary current-user installer. MSI is machine-scoped. A `NotSigned` result blocks public distribution.
+
+## 6. Clean-machine lifecycle gate
+
+Run `.github/workflows/windows-clean-machine.yml` on a fresh hosted Windows runner and record:
+
+- [ ] install;
+- [ ] first launch and process health;
+- [ ] same-version update/reinstall;
+- [ ] cross-version upgrade when a prior Pi GUI release exists;
+- [ ] uninstall;
+- [ ] registry cleanup;
+- [ ] app-data preservation.
+
+Do not use the development machine or an administratively extracted EXE as clean-machine evidence.
+
+## 7. Signed release gate
+
+- [ ] Windows NSIS and MSI have valid Authenticode signatures.
+- [ ] macOS app and DMG are signed and notarized.
+- [ ] Linux package contents and metadata pass smoke checks.
+- [ ] `.github/workflows/release.yml` creates a draft only.
+- [ ] `.github/workflows/release-smoke.yml` passes against the exact draft assets.
+- [ ] Release notes include lineage, known limitations, install network requirements, and verification links.
+
+## 8. Publish decision
+
+Publish only when sections 1–7 are complete or an item is explicitly documented as not applicable. The maintainer must record the tag, commit SHA, CI URLs, signing identities, artifact hashes, lifecycle evidence, and known issues in `docs/RELEASES.md`.

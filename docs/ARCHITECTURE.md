@@ -1,116 +1,93 @@
 # Architecture
 
-This document explains the **product architecture** (not deep code internals).
+This document describes the shipped React/Tauri architecture for the Pi GUI `0.1.0` candidate.
 
-## Mental model
-
-Pi GUI is a 3-layer system:
-
-1. **Desktop host (this app)**
-2. **Pi CLI runtime (`pi --mode rpc`)**
-3. **Packages/extensions**
+## System shape
 
 ```text
-User
-  -> Pi GUI UI (React + Tauri shell)
-    -> RPC bridge (stdin/stdout)
-      -> pi --mode rpc runtime
-        -> packages/extensions/skills/prompts/themes
+React 19 renderer
+  -> typed desktopApi / PiAdapter
+    -> Tauri invoke + events
+      -> Rust host
+        -> pi --mode rpc
+        -> native PTY
+        -> bounded filesystem and Git operations
+        -> managed Pi runtime lifecycle
 ```
 
----
+Pi remains the agent runtime and owns model execution, tool execution, session semantics, authentication, and package behavior. Pi GUI owns desktop presentation, process lifecycle, and narrow native operations.
 
-## Layer responsibilities
+## React renderer
 
-## 1) Desktop host (Pi GUI)
+The renderer provides:
 
-Owns:
-- windowing, panes, tabs, sidebar
-- native integrations (filesystem, window focus, notifications bridge)
-- workspace/project/session navigation
-- resilient runtime orchestration across sessions
-- rendering extension UI primitives (`notify`, `select`, `confirm`, `input`, `editor`, etc.)
+- native-looking window shell, theme persistence, workspace selection, and tool panels;
+- per-session message/model/activity snapshots;
+- JSONL RPC request correlation and event normalization;
+- file, Git, terminal, package, and runtime views backed by typed APIs.
 
-Does **not** try to own all agent workflow policy.
+It does not receive Node.js, Electron, general shell, general Git, or arbitrary filesystem APIs. `src/api/desktop-api.ts` is the frontend boundary; it does not expose arbitrary command arguments or environment variables.
 
-## 2) Pi runtime (`pi --mode rpc`)
+## Rust/Tauri host
 
-Owns:
-- model execution
-- conversation/session state
-- tool execution pipeline
-- package loading and runtime behavior
+The Rust host owns every privileged operation:
 
-Pi GUI talks to this runtime through the typed frontend adapter in `src/pi/pi-adapter.ts` and the Tauri/Rust process bridge in `src-tauri/src/lib.rs`.
+- Pi RPC child creation, stdin/stdout JSONL transport, generation IDs, and process-tree cleanup;
+- workspace canonicalization and bounded file reads/writes;
+- native PTY start/write/resize/stop;
+- fixed Git status/diff/worktree operations;
+- typed Pi package operations;
+- authentication metadata normalization and guarded credential removal;
+- managed runtime discovery, verified installation, activation, rollback, recovery, diagnostics, and logs.
 
-## 3) Packages/extensions
+Tauri capabilities are declared in `src-tauri/capabilities/default.json`. Renderer shell process grants are absent.
 
-Own optional behavior:
-- workflow automation
-- notification policy
-- project-specific conventions
-- extra commands/skills/prompts/themes
+## Session and RPC design
 
-This keeps the desktop shell generic and maintainable.
+Each loaded session has its own Pi RPC process. The frontend tracks a stable session runtime record, while Rust assigns an instance ID and generation so late events from an old process cannot mutate a replacement runtime.
 
-### Practical direction for ongoing development
+A monotonic selection guard makes the latest workspace/session selection win. Message, activity, model, and thinking state stay attached to that session. Disconnect, panel shutdown, window close, and application exit drain owned RPC/PTY/package child processes.
 
-- Keep app-core work focused on **UI polish + performance + reliability**.
-- Add new user-facing workflows through **packages/extensions first** whenever possible.
-- Treat Pi GUI as a **capability host** (`ctx.ui`, native shell bridge), not a hardcoded workflow layer.
+RPC transport is strict LF-delimited JSONL. The adapter handles delta-only message updates, authoritative message-end reconciliation, tool lifecycle events, abort, and the steer/follow-up gate without a mock agent.
 
-For an explicit host contract and capability list, see [`docs/CAPABILITY_MODEL.md`](./CAPABILITY_MODEL.md).
+## Data ownership
 
-When implementing package/extension-specific desktop affordances, follow [`docs/PACKAGE_CAPABILITY_TEMPLATE.md`](./PACKAGE_CAPABILITY_TEMPLATE.md).
+| Data | Owner |
+| --- | --- |
+| Pi sessions and authentication | Pi's local data directories |
+| Selected workspace and light/dark shell preference | WebView local storage |
+| Managed Pi versions, runtime settings, and lifecycle logs | Pi GUI application data |
+| Open-session UI snapshots | React memory |
+| Workspace files and Git repository | User-selected workspace |
 
----
+Credential values, prompts, model output, and environment variables are excluded from runtime diagnostics and lifecycle logs.
 
-## Runtime/session design
+## Models and authentication
 
-Pi GUI supports multiple sessions with one isolated Pi RPC runtime per opened session.
+Models and thinking levels come from live Pi RPC. Full model records are normalized before entering React state; provider headers, endpoints, and credential values are discarded.
 
-Key goals:
-- avoid cross-session state bleed
-- avoid stale event application when switching fast
-- keep UI responsive during reconnects/restarts
+Rust exposes only provider/source/credential-kind metadata. Credential removal is provider-scoped, confirmed, and preserves a malformed auth file instead of overwriting it. Interactive login remains in Pi TUI because Pi 0.84.2 does not expose login over RPC.
 
-Each runtime has a stable instance id and a Rust generation. Pi events update only the snapshot owned by that runtime, while a monotonic selection guard prevents a slower session load from replacing a newer selection. Model and thinking settings are stored on that same runtime snapshot, so switching sessions cannot bleed configuration across conversations. Closing or disconnecting drains every runtime process, including Windows `.cmd`/Volta descendant trees.
+## Packages and runtime resources
 
-## Model and authentication boundary
+Package list/install/remove/update delegates to the Pi CLI through fixed Rust commands. Project package settings are hidden until the user explicitly approves that workspace; package mutations warn that Pi packages execute with full system access.
 
-Model listing, selection, and thinking levels use Pi RPC. Full Pi model records are normalized to safe display fields before entering React state; provider headers, endpoint configuration, and credential material are discarded.
+The active Pi RPC process supplies extension, skill, and prompt commands through `get_commands`. Pi GUI groups and stages those commands in the composer. It does not currently host extension custom UI requests, package configuration forms, or a recommendation gallery.
 
-Authentication remains owned by Pi:
-- Rust exposes provider/source/type metadata, never credential values.
-- Environment credentials are read-only in the GUI.
-- Removing a credential stored in Pi requires an explicit confirmation and then disconnects all runtimes.
-- Interactive login is performed with `/login` in Pi TUI because Pi RPC 0.84.2 has no login command. The desktop does not add an Electron/Node auth host to work around that boundary.
+## Managed runtime
 
----
+Managed mode resolves, in order:
 
-## Onboarding + update flow
+1. a verified app-owned version;
+2. a packaged sidecar, if present;
+3. an existing system Pi as a non-mutating fallback.
 
-### First run
-Managed mode first resolves a verified version under the Desktop app-data directory, then a packaged sidecar, and finally an existing system Pi as a non-mutating fallback. The Runtime panel can install the matching standalone release after an explicit confirmation, or select an advanced system executable validated by the native layer.
+Update checks are manual. Installation accepts only the exact platform asset from the fixed Pi release source, checks the published SHA-256, constrains archive extraction, validates `pi --version`, and transactionally switches the active version. It never changes global npm packages or `PATH`.
 
-### Update flow
-Release checks are manual and lazy: opening the Runtime panel reads only local state, while **Check updates** queries the fixed `earendil-works/pi` latest-release endpoint. Install/update verifies the exact published SHA-256, constrains archive extraction, runs a bounded `pi --version`, and transactionally activates the version. Previous versions remain available for rollback. No global npm package or PATH entry is changed.
+Runtime maintenance is serialized and refused while RPC sessions are active. Previous verified versions remain available for rollback, and abandoned staging directories are recovered only when their owner lock is no longer active.
 
-Runtime maintenance is serialized and refused while Pi RPC sessions are active. Interrupted staging directories carry owner locks and are removed on startup only when abandoned. Diagnostics expose bounded lifecycle metadata, paths, versions, and process counts; prompts, model output, credentials, and environment variables are not logged.
+## Security and product boundary
 
----
+Pi GUI intentionally excludes Electron main/preload/agent-host code, Browser Agent, Channels, unrestricted shell execution, arbitrary Git commands, general renderer filesystem access, and silent runtime updates.
 
-## UI philosophy
-
-- neutral, low-noise visual language
-- minimal but clear controls
-- hover-revealed secondary actions
-- avoid flashy/unreadable high-contrast accents
-
----
-
-## Security boundary
-
-Tauri permissions are declared in `src-tauri/capabilities/default.json`.
-
-Important: native terminal, workspace, package, and runtime operations are exposed through typed Rust commands. The renderer cannot supply arbitrary runtime executable arguments or environment variables, and it has no generic shell-process bridge. Validate the declared capabilities against your environment policy before deployment.
+See `docs/PERMISSIONS.md` for the native authority boundary and `FEATURE_MAPPING.md` for the exact implemented/unsupported feature list.

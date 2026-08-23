@@ -9,21 +9,28 @@
 ## Validation
 
 - [ ] `npm run check`
+- [ ] `npm test`
 - [ ] `npm run build:frontend`
-- [ ] `cargo check --manifest-path src-tauri/Cargo.toml`
+- [ ] `cargo check --locked --manifest-path src-tauri/Cargo.toml`
+- [ ] `npm run check:release` (release-facing changes)
+- [ ] `npm run check:publish` (first-push/release changes)
 - [ ] Manual smoke tested (relevant flows)
 
 ## Screenshots (if UI)
 
-## Package capability checklist (if package/extension UX touched)
+## Package/ecosystem checklist (if touched)
 
 Reference: `docs/PACKAGE_CAPABILITY_TEMPLATE.md`
 
-- [ ] Dynamic capability discovery (no package-name hardcoding)
-- [ ] Package config lives in Packages modal
-- [ ] Runtime command execution remains write path
-- [ ] User-facing labels use Save/Apply (no raw slash-command labels)
-- [ ] Verified model-config package + capability-only package
+- [ ] Package mutation delegates to typed Pi operations
+- [ ] Project package access retains explicit trust/full-system-access warnings
+- [ ] Runtime resources come from live `get_commands/sourceInfo`
+- [ ] **Use** stages a command and does not auto-run it
+- [ ] No extension custom UI, config modal, or recommendation-gallery support is claimed
+
+## Privacy
+
+- [ ] No credentials, private paths, prompts/model output, session data, logs, or signing material are included
+- [ ] Screenshots and diagnostics are redacted
 
 ## Notes
-

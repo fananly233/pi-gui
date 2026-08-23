@@ -4,6 +4,20 @@
 
 `0.1.0` is an unpublished release candidate. Pi GUI has no independent `origin` remote yet, and the locally generated Windows installers are not signed. The Gustav project’s releases are upstream history, not Pi GUI releases.
 
+## Pre-push privacy status
+
+Recorded on Windows on 2026-08-23:
+
+- current tracked/non-ignored candidate files contain no detected common private-key, provider-token, credential-bearing URL, private-config filename, or current-machine home-path value;
+- the current Pi GUI `HEAD` history has no detected secret-pattern hits;
+- the local migration control prompt is ignored and has never appeared in Git history;
+- remote URLs contain no embedded credentials;
+- historical test-key and credential-URL fixtures exist only on the local `archive/electron-mvp` donor branch, not in `HEAD`; that branch must not be pushed to the independent repository;
+- all 26 post-fork commits now use the connected public GitHub identity and GitHub noreply author/committer email. The explicitly approved rewrite preserved commit count, topology, subjects, dates, and the final source tree while changing the derivative commit SHAs;
+- six donor-only issue/development logs remain local but are removed from the Git index and covered by exact ignore rules.
+
+`npm run check:publish` now passes across 143 tracked/non-ignored candidate files. It automates the content/history/metadata/remote/attribution checks and redacts suspected values from its output.
+
 ## Release identity
 
 | Field | Value |
@@ -49,7 +63,7 @@ Recorded on Windows on 2026-08-23:
 | --- | --- | --- |
 | Release identity and tag | PASS | `check:release` accepted `v0.1.0` and matched npm, lockfile, Cargo, Tauri, HTML, and Linux metainfo. |
 | TypeScript and renderer tests | PASS | Strict check plus 19 deterministic tests. |
-| Rust check and library tests | PASS | 23 tests passed; the one networked managed-runtime gate remained ignored by design. |
+| Rust check and library tests | PASS WITH DIAGNOSED TEST-RACE FOLLOW-UP | `cargo check --locked` passes. The first documentation/privacy recheck and its isolated retry timed out in the real PTY test. A no-product-code diagnostic proved the test sends its cursor-position response before observing the shell's DSR request: cold PowerShell can miss the early response, and Windows 11 `cmd` also emits DSR although the test excludes it. Six warmed `pwsh` runs passed, and the final serial library run passed 23 tests with one network gate ignored. The React/xterm path responds after actual terminal output, but the test should be synchronized to DSR and cover `cmd` before release. |
 | Frontend production build | PASS | 320 modules built. |
 | Full dependency audit | PASS | Zero reported production or development dependency vulnerabilities after updating the locked Vite 7 toolchain within its existing major version. |
 | Windows bundle build | PASS WITH LINKER INFO | Produced a 4,187,406-byte NSIS installer and a 6,021,120-byte MSI. The only Rust warning was the localized MSVC import-library linker message. |
@@ -81,16 +95,28 @@ npm run tauri -- build --bundles nsis,msi
 
 Also inspect generated WiX/NSIS metadata and run `Get-AuthenticodeSignature` on every Windows artifact. An unsigned result is a release blocker, not a warning to waive.
 
+Before the first public push, also run:
+
+```powershell
+npm run check:publish
+git status --short
+git diff --check
+git diff --cached
+```
+
+Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive/electron-mvp`, use `git push --all`, or use `git push --mirror`.
+
 ## Release sequence
 
 1. Confirm `package.json`, Cargo, Tauri, Linux metainfo, and the intended tag all agree.
 2. Run the local gates and record exact results.
-3. Connect an independent repository whose README and release notes retain the derivative-work declaration.
-4. Push the reviewed commit without rewriting or merging the donor histories.
-5. Run **Windows Clean-Machine Candidate**. A cross-version upgrade result is required once a prior Pi GUI release exists.
-6. Configure Windows signing and macOS signing/notarization. The current workflow intentionally creates a draft release only.
-7. Run **Signed Release Smoke** against the draft assets.
-8. Publish only after all required jobs pass and the release notes include attribution.
+3. Re-run `check:publish` on the final clean commit and review the branch diff against the Gustav base.
+4. Connect an independent repository whose README and release notes retain the derivative-work declaration and whose security settings enable private vulnerability reporting.
+5. Push only the reviewed Pi GUI branch without merging or pushing donor-only histories.
+6. Run **Windows Clean-Machine Candidate**. A cross-version upgrade result is required once a prior Pi GUI release exists.
+7. Configure Windows signing and macOS signing/notarization. The current workflow intentionally creates a draft release only.
+8. Run **Signed Release Smoke** against the draft assets.
+9. Publish only after all required jobs pass and the release notes include attribution.
 
 ## Expected artifacts
 

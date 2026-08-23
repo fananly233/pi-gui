@@ -30,10 +30,28 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Environment
-.env
-.env.local
-.env.*.local
+# Local configuration, credentials, and signing material
+.env*
+!.env.example
+.npmrc
+**/auth.json
+**/credentials.json
+**/secrets.json
+*.pem
+*.key
+*.p12
+*.pfx
+release-signing/
+.pi/
+.codex/
+.pi-gui/
+
+# Local research and orchestration notes
+Pi Desktop Tauri 整合迁移 — Codex 主控提示词.md
+/deep-research-report.md
+/commandsdevelopment.md
+/docs/ISSUE_IMPLEMENTATION_LOG_*.md
+/issues/
 
 # Temporary
 *.tmp

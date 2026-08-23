@@ -1,61 +1,31 @@
-# Pi GUI Themes: Mapping and Behavior
+# Pi GUI and Pi Themes
 
-This document explains how Pi GUI maps Pi theme files (`~/.pi/agent/themes/*.json`) to desktop UI tokens.
+Pi GUI currently has two separate theme concepts. They are intentionally not mapped to each other.
 
-## Default bundled themes
+## Desktop shell theme
 
-Pi GUI includes a default first-party theme set (installed on first desktop startup):
+The React shell supports `light` and `dark`. The title-bar toggle stores the preference in WebView local storage under `pi-theme`, applies it on startup, and updates the xterm palette.
 
-- `pi-desktop-notion-dark.json`
-- `pi-desktop-catppuccin-dark.json`
-- `pi-desktop-github-dark.json`
-- `pi-desktop-vscode-plus-dark.json`
-- `pi-desktop-notion-light.json`
-- `pi-desktop-vscode-plus-light.json`
-- `pi-desktop-catppuccin-light.json`
-- `pi-desktop-github-light.json`
+This setting changes Pi GUI only. It does not write Pi configuration or select a Pi TUI theme.
 
-These files are placed in:
+## Pi theme inventory
 
-- `~/.pi/agent/themes`
+The Packages/Resources panel lists:
 
-All bundled files are written in full Pi CLI theme schema format (all required `colors` tokens), so they are valid both in Desktop and in `pi` CLI.
+- Pi built-in `dark` and `light`;
+- direct JSON themes under the user's Pi themes directory;
+- direct project themes for the selected workspace.
 
-## Theme package behavior
+The Rust command parses only bounded metadata needed for the list. Package-owned themes remain managed through their package and are not expanded into a second desktop package model.
 
-In the Packages pane, **Pi GUI Themes** behaves like a package:
+## Current limitations
 
-- **Install**: restores bundled default theme files.
-- **Uninstall**: removes bundled default theme files.
+Pi GUI `0.1.0` does not:
 
-Only the bundled theme files are touched; user-created themes are not removed.
+- bundle or auto-install a Pi theme set;
+- repair or rewrite user theme files;
+- activate a Pi theme;
+- project Pi JSON color tokens into React CSS variables;
+- duplicate the interactive `pi config` theme picker.
 
-Automatic bootstrap happens only once on first desktop startup. After explicit uninstall, themes stay uninstalled until you install the package again.
-
-Desktop also repairs legacy bundled theme files that were created with an older, incomplete schema (missing required tokens), so existing installations are cleaned up without manual edits.
-
-## Theme variant detection (Light vs Dark)
-
-The Settings theme dropdowns separate themes into light and dark variants.
-
-Variant detection order:
-
-1. `piDesktop.variant` in theme JSON (`"light" | "dark"`), if present.
-2. Background luminance heuristic from resolved background color.
-3. Filename fallback (`-light` / `-dark`).
-
-## Desktop token mapping
-
-Pi GUI projects Pi theme tokens into desktop semantic tokens, focused on:
-
-- Accent
-- Background/surfaces
-- Foreground/text
-
-Primary theme color sources used from Pi theme files:
-
-- Accent candidates: `accent`, `toolTitle`, `mdHeading`, `mdLink`, `customMessageLabel`
-- Background candidates: `selectedBg`, `userMessageBg`, `customMessageBg`, `toolPendingBg`, `mdCodeBlock`
-- Foreground candidates: `text`, `userMessageText`, `customMessageText`, `toolOutput`, `syntaxVariable`
-
-Foreground is used mainly for text hierarchy and borders; surface tinting stays background-led to avoid heavy overlay/veil effects.
+Any future mapping must define a stable Pi schema contract, preserve user files, and keep desktop-shell preference separate from Pi runtime configuration.

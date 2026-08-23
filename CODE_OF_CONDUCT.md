@@ -1,38 +1,39 @@
 # Code of Conduct
 
-## Our Pledge
+## Our pledge
 
-We pledge to make participation in our community a harassment-free experience for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socio-economic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
+We pledge to make participation in this project harassment-free for everyone, regardless of age, body size, visible or invisible disability, ethnicity, sex characteristics, gender identity and expression, level of experience, education, socioeconomic status, nationality, personal appearance, race, religion, or sexual identity and orientation.
 
-## Our Standards
+## Our standards
 
-Examples of behavior that contributes to a positive environment:
-- Being respectful and constructive
-- Giving and receiving feedback gracefully
-- Focusing on what is best for the community and project
-- Showing empathy toward others
+Examples of positive behavior include:
 
-Examples of unacceptable behavior:
-- Harassment, trolling, insulting or derogatory comments
-- Public or private abuse
-- Publishing others’ private information without permission
-- Any conduct that would be inappropriate in a professional setting
+- being respectful and constructive;
+- giving and receiving feedback gracefully;
+- focusing on what is best for the project and its users;
+- showing empathy toward other contributors.
 
-## Enforcement Responsibilities
+Unacceptable behavior includes:
 
-Project maintainers are responsible for clarifying and enforcing our standards and may remove, edit, or reject comments, commits, code, issues, and other contributions that are not aligned with this Code of Conduct.
+- harassment, trolling, insults, or derogatory comments;
+- public or private abuse;
+- publishing another person's private information without permission;
+- conduct that would be inappropriate in a professional setting.
+
+## Enforcement responsibilities
+
+Project maintainers may remove, edit, or reject comments, commits, code, issues, and contributions that do not align with this Code of Conduct. Enforcement decisions should protect reporter privacy and avoid publishing sensitive evidence.
 
 ## Scope
 
-This Code of Conduct applies within all project spaces and when an individual is officially representing the project in public spaces.
+This Code of Conduct applies in project spaces and when someone officially represents the project in public spaces.
 
-## Enforcement
+## Reporting
 
-Report unacceptable behavior to: **hello@gustavonline.com**
+Use the independent repository's private maintainer contact when it becomes available. Do not put private conduct reports in public issues, and do not send Pi GUI reports to donor-project contacts.
 
-All reports will be reviewed and investigated promptly and fairly.
+The public repository must configure a private reporting route before accepting outside contributions.
 
 ## Attribution
 
-This Code of Conduct is adapted from the Contributor Covenant, version 2.1:
-https://www.contributor-covenant.org/version/2/1/code_of_conduct.html
+This Code of Conduct is adapted from the [Contributor Covenant, version 2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct.html).

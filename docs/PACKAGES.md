@@ -1,80 +1,51 @@
-# Packages, Extensions, and Resource Philosophy
+# Packages, Extensions, Skills, Prompts, and Themes
 
-Pi GUI is designed for an **extension-first** ecosystem.
+This document describes the current Pi GUI React/Tauri implementation. Pi remains the package manager and runtime policy owner.
 
-## Why packages matter
+## Package operations
 
-The desktop app should not hardcode every behavior. Instead:
+The Packages panel delegates these operations to Pi through typed Rust commands:
 
-- host UX lives in Pi GUI,
-- agent behavior can be layered through packages/extensions.
+- list user packages;
+- list project packages after explicit workspace trust;
+- install a package in user or project scope;
+- remove the exact listed source from its scope;
+- update extensions.
 
-This enables community-driven capability growth without turning the desktop shell into a monolith.
+Pi GUI does not implement npm/git installation itself and does not rewrite Pi's package settings. Mutations are serialized, output is capped, execution times out, and owned children are stopped when the app closes.
 
-### Capability host model
+Local install sources must resolve inside the selected workspace. Option-like sources and arbitrary Pi arguments are rejected.
 
-Pi GUI should expose capabilities that extensions can consume (UI primitives, native shell affordances, RPC bridge integration). In other words: extensions make the app do more, while app-core stays lightweight and maintainable.
+## Project trust
 
----
+Project package configuration is hidden by default. The user must explicitly approve reading it, and every project-scoped install/remove/update warning explains that Pi packages can execute with full system access.
 
-## What Pi GUI surfaces
+Approval lets Pi apply its own project package rules; it is not a sandbox. Only use packages and workspaces you trust.
 
-Pi GUI includes a Packages pane that supports:
-- extension package install/remove/update flows
-- skills + extensions surfaced as first-class package capabilities
-- curated recommendations (skills + extensions)
+## Runtime resources
 
-It also renders extension-driven UI signals through the extension UI host boundary.
+A ready session calls Pi RPC `get_commands`. Pi GUI normalizes real `sourceInfo` and groups invokable:
 
-### Skills + extensions in Desktop
+- extensions/plugins;
+- skills;
+- prompt templates.
 
-In the Packages pane:
-- **Installed** lists all installed skills + extensions in one view.
-- **Recommended** blends curated skills/extensions (Brave Search, Browser Tools, YouTube Transcript) with top extension picks and search results.
-- list rows keep minimal controls (`+` to install, `✓` when installed)
-- clicking an item opens a details modal for richer actions:
-  - extension settings/config commands
-  - install / uninstall
-  - open folder / open page
-  - skill setup + “try in chat”
-- model-picker settings hydrate from extension config JSON when available (e.g. `~/.pi/agent/extensions/<package>.json`)
-- **Create skill** stages `/skill:creatorskill` in chat for manual Enter
+Clicking **Use** stages `/<command>` in the composer with a trailing space. It never executes automatically. Built-in TUI-only commands are absent when Pi does not expose them through RPC.
 
-If runtime discovery fails, Desktop shows explicit error banners and keeps diagnostics available in the Packages pane.
-The pane also shows an explicit initial loading state (`Loading packages…`) to avoid confusing partial renders while RPC/package discovery is still in progress.
+Pi GUI currently does not provide extension custom UI handling or package-specific configuration forms.
 
----
+## Themes
 
-## What should live in packages (preferred)
+The panel lists:
 
-Examples:
-- notification policy (when/why to notify)
-- naming automation
-- project guardrails and conventions
-- workflow-specific custom commands
+- Pi built-in `dark` and `light`;
+- direct user themes;
+- direct project themes after the workspace is selected.
 
-## What should stay in app core
+Package-owned themes remain represented and managed by their package. Pi GUI does not ship a recommendation gallery, install bundled themes, activate a Pi theme, or duplicate `pi config`.
 
-Examples:
-- sidebar/workspaces/tabs
-- chat/file/terminal/packages pane shell
-- runtime/session switching and reliability
-- native integrations (window/fs/dialog)
+## Deliberate omissions
 
----
+The current core has no curated marketplace, package search service, popularity ranking, automatic recommendations, default package auto-install, or desktop-owned package policy. Those inherited Gustav concepts are not part of Pi GUI `0.1.0`.
 
-## Authoring package UX
-
-When building packages/extensions for desktop compatibility:
-- prefer `ctx.ui.*` APIs over terminal escape sequence tricks
-- keep status text concise and desktop-safe
-- expose behavior as optional, user-installable modules
-
-For Desktop-side implementation rules (modal settings flow, dynamic command discovery, Save/Apply UX labels), follow [`docs/PACKAGE_CAPABILITY_TEMPLATE.md`](./PACKAGE_CAPABILITY_TEMPLATE.md).
-
----
-
-## Recommended package model
-
-The app ships with a curated recommended list (npm/git/url source hints).
-This keeps core app small while helping users discover useful add-ons.
+For implementation constraints, see `docs/PACKAGE_CAPABILITY_TEMPLATE.md` and `docs/PERMISSIONS.md`.
