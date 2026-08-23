@@ -17,6 +17,34 @@ const MAX_PI_PACKAGE_OUTPUT_BYTES: usize = 512 * 1024;
 const MAX_PI_PACKAGE_SOURCE_BYTES: usize = 512;
 const MAX_PI_THEME_BYTES: u64 = 256 * 1024;
 const PI_PACKAGE_TIMEOUT: Duration = Duration::from_secs(120);
+const PI_GUI_DATA_DIR_ENV: &str = "PI_GUI_DATA_DIR";
+
+fn validate_app_data_override(
+    value: Option<std::ffi::OsString>,
+) -> Result<Option<PathBuf>, String> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.is_empty() {
+        return Err(format!("{PI_GUI_DATA_DIR_ENV} cannot be empty"));
+    }
+    let path = PathBuf::from(value);
+    if !path.is_absolute() || path.parent().is_none() {
+        return Err(format!(
+            "{PI_GUI_DATA_DIR_ENV} must be an absolute, non-root directory"
+        ));
+    }
+    Ok(Some(path))
+}
+
+pub(crate) fn app_data_root(app: &AppHandle) -> Result<PathBuf, String> {
+    if let Some(path) = validate_app_data_override(std::env::var_os(PI_GUI_DATA_DIR_ENV))? {
+        return Ok(path);
+    }
+    app.path()
+        .app_data_dir()
+        .map_err(|error| format!("Failed to resolve the desktop app data directory: {error}"))
+}
 
 #[cfg(target_os = "windows")]
 fn terminate_windows_process_tree(pid: u32) {
@@ -973,10 +1001,7 @@ fn get_pi_sessions_dir(app: &AppHandle) -> Result<PathBuf, String> {
     }
 
     // Fallback for unusual environments
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let data_dir = app_data_root(app)?;
     Ok(data_dir.join("sessions"))
 }
 
@@ -2370,10 +2395,7 @@ impl Default for AppSettings {
 /// Save app settings
 #[tauri::command]
 async fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), String> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let data_dir = app_data_root(&app)?;
 
     // Ensure directory exists
     fs::create_dir_all(&data_dir).map_err(|e| format!("Failed to create data dir: {}", e))?;
@@ -2388,10 +2410,7 @@ async fn save_settings(app: AppHandle, settings: AppSettings) -> Result<(), Stri
 /// Load app settings
 #[tauri::command]
 async fn load_settings(app: AppHandle) -> Result<AppSettings, String> {
-    let data_dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {}", e))?;
+    let data_dir = app_data_root(&app)?;
 
     let settings_path = data_dir.join("settings.json");
 
@@ -4147,8 +4166,9 @@ mod tests {
         list_workspace_directory_impl, normalize_auth_provider, parse_git_status,
         parse_pi_package_list, read_session_file, read_workspace_text_file_impl,
         remove_git_worktree_impl, spawn_terminal_process, spawn_terminal_process_with_shell,
-        validate_pi_install_source, validate_pi_package_source, write_workspace_text_file_impl,
-        PiPackageScope, PiThemeScope, SpawnedTerminal, MAX_WORKSPACE_FILE_BYTES,
+        validate_app_data_override, validate_pi_install_source, validate_pi_package_source,
+        write_workspace_text_file_impl, PiPackageScope, PiThemeScope, SpawnedTerminal,
+        MAX_WORKSPACE_FILE_BYTES,
     };
     use std::fs;
     use std::io::{Read, Write};
@@ -4185,6 +4205,24 @@ mod tests {
             .status()
             .expect("run git test command");
         assert!(status.success(), "git command failed: git {:?}", args);
+    }
+
+    #[test]
+    fn accepts_only_absolute_non_root_app_data_overrides() {
+        let valid = std::env::temp_dir().join("pi-gui-data-override-test");
+        assert_eq!(
+            validate_app_data_override(Some(valid.clone().into_os_string()))
+                .expect("accept absolute app data override"),
+            Some(valid)
+        );
+        assert!(validate_app_data_override(Some("relative/path".into())).is_err());
+        assert!(
+            validate_app_data_override(Some(std::path::MAIN_SEPARATOR.to_string().into())).is_err()
+        );
+        assert_eq!(
+            validate_app_data_override(None).expect("allow missing override"),
+            None
+        );
     }
 
     #[test]

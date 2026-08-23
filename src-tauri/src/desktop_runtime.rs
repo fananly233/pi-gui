@@ -12,7 +12,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 
 const PI_RELEASE_API: &str = "https://api.github.com/repos/earendil-works/pi/releases/latest";
 const PI_RELEASE_DOWNLOAD_PREFIX: &str = "https://github.com/earendil-works/pi/releases/download/";
@@ -346,10 +346,7 @@ fn unix_time_millis() -> u64 {
 }
 
 pub(crate) fn runtime_root(app: &AppHandle) -> Result<PathBuf, String> {
-    app.path()
-        .app_data_dir()
-        .map(|path| path.join(RUNTIME_DIRECTORY))
-        .map_err(|error| format!("Failed to resolve the desktop app data directory: {error}"))
+    crate::app_data_root(app).map(|path| path.join(RUNTIME_DIRECTORY))
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {
