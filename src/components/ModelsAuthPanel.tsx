@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
 	desktopApi,
 	type PiAuthProviderStatus,
@@ -81,7 +81,7 @@ export function ModelsAuthPanel({ open, onClose, chat }: ModelsAuthPanelProps) {
 	const [logoutConfirmation, setLogoutConfirmation] = useState<string | null>(null);
 	const refreshEpoch = useRef(0);
 
-	const refresh = async () => {
+	const refresh = useCallback(async () => {
 		const epoch = ++refreshEpoch.current;
 		setLoading(true);
 		setError(null);
@@ -110,7 +110,7 @@ export function ModelsAuthPanel({ open, onClose, chat }: ModelsAuthPanelProps) {
 		}
 		setError(failures.length > 0 ? failures.join(" ") : null);
 		setLoading(false);
-	};
+	}, [chat.loadModelConfiguration, chat.sessionReady]);
 
 	useEffect(() => {
 		if (!open) return;
@@ -121,9 +121,7 @@ export function ModelsAuthPanel({ open, onClose, chat }: ModelsAuthPanelProps) {
 		return () => {
 			refreshEpoch.current += 1;
 		};
-		// A new active runtime owns a different model configuration.
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [open, chat.activeRuntimeKey]);
+	}, [open, chat.activeRuntimeKey, chat.sessionReady, refresh]);
 
 	useEffect(() => {
 		if (!open) return;
