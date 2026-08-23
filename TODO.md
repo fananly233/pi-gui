@@ -25,9 +25,9 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Commit the documentation/privacy pass with the repository-local noreply identity (`df39d05`).
 - [x] Create the independent public repository at `https://github.com/fananly233/pi-gui`.
 - [x] Add its credential-free URL as `origin`; keep `gustav` and `dlyzzt` as donor remotes.
-- [ ] Push only the reviewed Pi GUI branch. Do not push `archive/electron-mvp`, use `--all`, or use `--mirror`.
+- [x] Push only the reviewed Pi GUI history to `origin/main`; do not push `archive/electron-mvp`, use `--all`, or use `--mirror`.
 - [x] Replace placeholder repository references with the independent repository URL.
-- [ ] Enable and verify GitHub private vulnerability reporting.
+- [x] Enable and verify GitHub private vulnerability reporting through GitHub's dedicated API.
 - [ ] Review the inherited `Pi DESK` icon/source filename against final Pi GUI branding.
 
 ## Blocking before public release

@@ -10,7 +10,7 @@ Pi GUI `0.1.0` is an unpublished derivative release candidate. A local build or 
 - [x] README explains the product, installation, first-use flow, current limitations, and privacy model.
 - [x] README, release notes, license, and `THIRD_PARTY_NOTICES.md` retain Gustav and DLYZZT attribution.
 - [x] No document presents donor releases, branches, issue numbers, or smoke results as Pi GUI evidence.
-- [ ] The public repository URL and private security-reporting route are configured.
+- [x] The public repository URL and private security-reporting route are configured.
 - [ ] Branding/icon naming is reviewed for the Pi GUI identity.
 
 ## 2. Pre-push privacy gate
@@ -21,7 +21,7 @@ Pi GUI `0.1.0` is an unpublished derivative release candidate. A local build or 
 - [x] `git status --short`, `git diff --check`, and the staged diff are reviewed.
 - [x] No `.env`, Pi auth/session data, local app data, signing material, logs, personal paths, or local orchestration notes are tracked.
 - [x] Remote URLs contain no embedded credentials.
-- [ ] Only the reviewed Pi GUI branch is pushed. Never use `git push --all` or `git push --mirror`; `archive/electron-mvp` is a local donor-work archive.
+- [x] Only the reviewed Pi GUI history was pushed. Never use `git push --all` or `git push --mirror`; `archive/electron-mvp` is a local donor-work archive.
 
 Changing existing commit author/committer metadata rewrites commit hashes. It requires explicit approval and must happen before the first public push.
 

@@ -4,7 +4,7 @@
 
 `0.1.0` is an unpublished release candidate. The independent repository is [fananly233/pi-gui](https://github.com/fananly233/pi-gui), and the locally generated Windows installers are not signed. The Gustav project’s releases are upstream history, not Pi GUI releases.
 
-## Pre-push privacy status
+## Repository publication and privacy status
 
 Recorded on Windows on 2026-08-23:
 
@@ -14,7 +14,9 @@ Recorded on Windows on 2026-08-23:
 - remote URLs contain no embedded credentials;
 - historical test-key and credential-URL fixtures exist only on the local `archive/electron-mvp` donor branch, not in `HEAD`; that branch must not be pushed to the independent repository;
 - all derivative commits through the current `HEAD` use the connected public GitHub identity and GitHub noreply author/committer email. The explicitly approved rewrite preserved commit count, topology, subjects, dates, and the final source tree while changing the rewritten commit SHAs;
-- six donor-only issue/development logs remain local but are removed from the Git index and covered by exact ignore rules.
+- six donor-only issue/development logs remain local but are removed from the Git index and covered by exact ignore rules;
+- only the reviewed Pi GUI history was pushed to `origin/main`; the generated one-file remote root was replaced with an exact lease after its `fananly` MIT copyright line was retained in `LICENSE`, and its original commit remains recoverable from a local bundle;
+- GitHub private vulnerability reporting is enabled and was verified through the dedicated repository API.
 
 `npm run check:publish` now passes across 143 tracked/non-ignored candidate files. It automates the content/history/metadata/remote/attribution checks and redacts suspected values from its output.
 
@@ -70,7 +72,7 @@ Recorded on Windows on 2026-08-23:
 | Generated installer metadata | PASS | `Pi GUI`, `0.1.0`, `com.pi.gui`, current-user NSIS, per-machine MSI, fixed upgrade code, and downgrade blocking were present. |
 | MSI extraction and isolated executable launch | PASS, NOT CLEAN-MACHINE | Administrative extraction contained `pi-gui.exe`; it remained alive for eight seconds with isolated app-data environment variables. No installer was run on the development machine. |
 | Windows signatures | BLOCKED | Main EXE, NSIS, and MSI all report `NotSigned`. |
-| Hosted clean-machine lifecycle | NOT RUN | The independent `origin` is connected. The workflow can run after the reviewed history replaces the generated, unrelated one-file `main` branch. |
+| Hosted clean-machine lifecycle | READY, NOT RUN | The reviewed history is now on the default `main` branch and the manual workflow is available to run. |
 
 Candidate SHA-256 values:
 

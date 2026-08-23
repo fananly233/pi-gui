@@ -10,7 +10,7 @@ This section will list supported versions after signing and clean-machine releas
 
 Do not open a public issue containing vulnerability details, credentials, private prompts, session files, or reproduction data from a private repository.
 
-Before the first public release, the Pi GUI repository must enable [GitHub private vulnerability reporting](https://github.com/fananly233/pi-gui/security/advisories/new). Use that private channel once it is available. Pi GUI reports must not be sent to the Gustav or DLYZZT maintainers unless the issue is independently reproduced in their project.
+The Pi GUI repository has enabled [GitHub private vulnerability reporting](https://github.com/fananly233/pi-gui/security/advisories/new). Use that channel for vulnerability details. Pi GUI reports must not be sent to the Gustav or DLYZZT maintainers unless the issue is independently reproduced in their project.
 
 A useful report includes:
 
@@ -20,7 +20,7 @@ A useful report includes:
 - redacted logs or screenshots;
 - suggested remediation, if known.
 
-If the private advisory form is unavailable, private vulnerability reporting is not yet enabled. Do not put sensitive details in a public issue; publishing remains blocked until the private channel is operational.
+If the private advisory form is unexpectedly unavailable, do not put sensitive details in a public issue; report the channel outage without including vulnerability details.
 
 ## Security boundary
 
