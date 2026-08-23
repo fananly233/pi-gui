@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { EventNormalizer } from "../src/pi/event-normalizer.ts";
-import { createIsolatedPiEnvironment, isolatedDiscoveryArgs } from "./real-pi-gate-environment.mjs";
+import {
+	createIsolatedPiEnvironment,
+	isolatedDiscoveryArgs,
+	requestRealPiStartupState,
+} from "./real-pi-gate-environment.mjs";
 
 const provider = process.env.PI_GUI_GATE_PROVIDER || "deepseek";
 const model = process.env.PI_GUI_GATE_MODEL || "deepseek-v4-flash";
@@ -170,7 +174,7 @@ const harness = new RealPiHarness(isolatedPi.environment);
 try {
 	console.log(`[gate] starting real Pi RPC with ${provider}/${model}`);
 	harness.start();
-	const stateResponse = await harness.request({ type: "get_state" });
+	const stateResponse = await requestRealPiStartupState(harness);
 	assert.equal(stateResponse.data?.model?.provider, provider);
 	assert.equal(stateResponse.data?.model?.id, model);
 	await harness.request({ type: "set_thinking_level", level: "high" });

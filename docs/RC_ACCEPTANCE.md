@@ -24,7 +24,7 @@ The Phase 9 code tip passed on Windows x86_64:
 | `npm ci` | PASS; locked dependency graph installed with zero reported vulnerabilities. |
 | `RELEASE_TAG=v0.1.0 npm run check:release` | PASS. |
 | `npm run check` | PASS. |
-| `npm test` | PASS; 25 tests. |
+| `npm test` | PASS; 26 tests. |
 | `npm run build:frontend` | PASS. |
 | `cargo fmt --check` | PASS. |
 | `cargo check --locked` | PASS. |

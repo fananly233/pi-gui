@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { createIsolatedPiEnvironment, isolatedDiscoveryArgs } from "./real-pi-gate-environment.mjs";
+import {
+	createIsolatedPiEnvironment,
+	isolatedDiscoveryArgs,
+	requestRealPiStartupState,
+} from "./real-pi-gate-environment.mjs";
 
 const provider = process.env.PI_GUI_GATE_PROVIDER || "deepseek";
 const model = process.env.PI_GUI_GATE_MODEL || "deepseek-v4-flash";
@@ -132,7 +136,7 @@ let restored = false;
 try {
 	console.log(`[gate] starting real Pi model RPC with ${provider}/${model}`);
 	first.start();
-	initialState = (await first.request({ type: "get_state" })).data;
+	initialState = (await requestRealPiStartupState(first)).data;
 	assert.equal(initialState?.model?.provider, provider);
 	assert.equal(initialState?.model?.id, model);
 
@@ -172,7 +176,7 @@ try {
 	const restarted = new ModelPiHarness("models-restart", isolatedPi.environment);
 	try {
 		restarted.start();
-		const restartedState = (await restarted.request({ type: "get_state" })).data;
+		const restartedState = (await requestRealPiStartupState(restarted)).data;
 		assert.equal(restartedState?.model?.provider, provider);
 		assert.equal(restartedState?.model?.id, model);
 		console.log("[gate] clean Pi process restart with requested model: PASS");

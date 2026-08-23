@@ -4,6 +4,7 @@ import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 
 const copiedConfigFiles = ["auth.json", "settings.json", "models.json"];
+export const REAL_PI_RPC_STARTUP_TIMEOUT_MS = 300_000;
 
 export const isolatedDiscoveryArgs = [
 	"--no-extensions",
@@ -13,6 +14,10 @@ export const isolatedDiscoveryArgs = [
 	"--no-context-files",
 	"--no-approve",
 ];
+
+export function requestRealPiStartupState(harness) {
+	return harness.request({ type: "get_state" }, REAL_PI_RPC_STARTUP_TIMEOUT_MS);
+}
 
 async function optionalHash(path) {
 	try {

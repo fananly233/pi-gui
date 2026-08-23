@@ -3,7 +3,11 @@ import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawn, spawnSync } from "node:child_process";
-import { createIsolatedPiEnvironment, isolatedDiscoveryArgs } from "./real-pi-gate-environment.mjs";
+import {
+	createIsolatedPiEnvironment,
+	isolatedDiscoveryArgs,
+	requestRealPiStartupState,
+} from "./real-pi-gate-environment.mjs";
 
 const provider = process.env.PI_GUI_GATE_PROVIDER || "deepseek";
 const model = process.env.PI_GUI_GATE_MODEL || "deepseek-v4-flash";
@@ -176,7 +180,7 @@ let restartedHarness = null;
 try {
 	console.log(`[session-gate] isolated session dir: ${sessionDir}`);
 	harness.start();
-	const initialState = await harness.request({ type: "get_state" });
+	const initialState = await requestRealPiStartupState(harness);
 	assert.equal(initialState.data?.model?.provider, provider);
 	assert.equal(initialState.data?.model?.id, model);
 	await harness.request({ type: "set_thinking_level", level: "off" });
@@ -262,7 +266,7 @@ try {
 
 	restartedHarness = new PersistentPiHarness(sessionDir, isolatedPi.environment);
 	restartedHarness.start();
-	const restartedState = await restartedHarness.request({ type: "get_state" });
+	const restartedState = await requestRealPiStartupState(restartedHarness);
 	assert.equal(restartedState.data?.model?.provider, provider);
 	assert.equal(restartedState.data?.model?.id, model);
 	const resumedAfterRestart = await restartedHarness.request({ type: "switch_session", sessionPath: sourcePath });
