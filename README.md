@@ -6,7 +6,7 @@ Pi GUI 是一个面向 [Pi coding agent](https://github.com/earendil-works/pi) �
 
 [![MIT license](https://img.shields.io/badge/license-MIT-6b7280?style=for-the-badge)](./LICENSE)
 
-> 当前状态：`0.1.0` 仍是未发布的 Windows-only 二进制候选版。源码仓库位于 [fananly233/pi-gui](https://github.com/fananly233/pi-gui)，GitHub-hosted Windows 安装生命周期已经通过，但候选安装包尚未签名，因此目前最可靠的使用方式仍是从源码运行。macOS 和 Linux 可以继续从源码构建，但不属于 `0.1.0` 的受支持发行资产。不要把 Gustav 的历史 Release 当作 Pi GUI 的 Release。
+> 当前状态：`0.1.0` 是尚未发布的源码候选版，项目决定**仅发布源码**。源码仓库位于 [fananly233/pi-gui](https://github.com/fananly233/pi-gui)；未来的 Pi GUI Release 只提供 GitHub 根据版本标签自动生成的源码 ZIP/tar.gz，不提供官方 EXE、MSI 或其他平台二进制。Windows clean-machine 生命周期测试仍用于工程验证，但其临时安装包不会作为 Release 或 Actions artifact 分发。不要把 Gustav 的历史 Release 当作 Pi GUI 的 Release。
 
 ## 这个项目能做什么
 
@@ -44,7 +44,7 @@ npm ci
 npm run tauri dev
 ```
 
-构建本机安装包：
+本地验证与构建（生成内容仅供开发者自行测试）：
 
 ```powershell
 npm run check:release
@@ -57,7 +57,7 @@ npm audit
 npm run build
 ```
 
-Windows 产物位于 `src-tauri/target/release/bundle/`。`0.1.0` 只计划发布签名后的 Windows NSIS 和 MSI；在正式 Release 出现前，不建议把本地未签名安装包分发给普通用户。
+Windows 本地构建产物位于 `src-tauri/target/release/bundle/`。这些文件不是官方 Pi GUI 发布资产，项目不会上传、签名或支持其公开分发；普通用户应从源码运行或自行审阅并构建。
 
 ## 第一次使用
 
@@ -83,6 +83,7 @@ Windows 产物位于 `src-tauri/target/release/bundle/`。`0.1.0` 只计划发�
 - 生命周期日志不记录 prompt、模型输出、凭据或环境变量；
 - 当前代码没有集成 analytics/telemetry SDK，但 Pi 调用模型、检查 runtime 更新或下载 runtime 时仍会按功能需要联网；
 - `.env`、Pi/Codex 本地状态、认证文件、签名私钥、日志和本地主控提示词均被忽略；正式推送前运行 `npm run check:publish`；
+- 迁移工作区可能保留 donor 的本地 `v*` 标签；不要运行 `git push --tags`。Pi GUI 自有源码标签使用 `pi-gui-v*` 前缀，并且只能单独推送已审阅的标签；
 - 应用拥有工作区文件和本地进程权限，请只连接你信任的目录和 package。详细边界见 [docs/PERMISSIONS.md](./docs/PERMISSIONS.md)。
 
 ## 开发与验证
@@ -107,7 +108,7 @@ npm run gate:ecosystem-real
 npm run gate:runtime-real
 ```
 
-这些 real gates 会把可变 Pi 配置、会话和 managed runtime 放入隔离临时目录，并验证真实 Pi 配置没有变化；它们仍会调用真实 Pi，部分步骤也会访问网络。发布、签名与 clean-machine 验证流程见 [docs/RELEASES.md](./docs/RELEASES.md)、[docs/SIGNING.md](./docs/SIGNING.md)、[docs/RC_ACCEPTANCE.md](./docs/RC_ACCEPTANCE.md) 和 [RELEASE_CRITERIA.md](./RELEASE_CRITERIA.md)。
+这些 real gates 会把可变 Pi 配置、会话和 managed runtime 放入隔离临时目录，并验证真实 Pi 配置没有变化；它们仍会调用真实 Pi，部分步骤也会访问网络。源码发布策略与 clean-machine 工程验证边界见 [docs/RELEASES.md](./docs/RELEASES.md)、[docs/SIGNING.md](./docs/SIGNING.md)、[docs/RC_ACCEPTANCE.md](./docs/RC_ACCEPTANCE.md) 和 [RELEASE_CRITERIA.md](./RELEASE_CRITERIA.md)。
 
 ## 文档
 
@@ -117,7 +118,7 @@ npm run gate:runtime-real
 - [Packages、extensions 与 resources](./docs/PACKAGES.md)
 - [发布流程](./docs/RELEASES.md)
 - [0.1 RC 验收记录](./docs/RC_ACCEPTANCE.md)
-- [发布签名](./docs/SIGNING.md)
+- [源码分发与签名策略](./docs/SIGNING.md)
 - [图标维护](./docs/ICONS.md)
 - [贡献指南](./CONTRIBUTING.md)
 - [安全策略](./SECURITY.md)

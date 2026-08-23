@@ -1,23 +1,23 @@
-name: Signed Windows Release Candidate
+name: Source-only Release
 
 on:
   push:
     tags:
-      - "v*"
+      - "pi-gui-v*"
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing tag to build (example: v0.1.0)"
+        description: "Existing Pi GUI source tag to validate (example: pi-gui-v0.1.0)"
         required: true
-        default: "v0.1.0"
+        default: "pi-gui-v0.1.0"
         type: string
 
 permissions:
   contents: read
 
 jobs:
-  validate-release:
-    name: Validate release tag
+  validate-source:
+    name: Validate source policy
     runs-on: ubuntu-22.04
     outputs:
       tag: ${{ steps.release_tag.outputs.tag }}
@@ -38,7 +38,7 @@ jobs:
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             TAG="${{ inputs.tag }}"
           fi
-          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+          if [[ ! "$TAG" =~ ^pi-gui-v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
             echo "Invalid release tag: $TAG" >&2
             exit 1
           fi
@@ -48,17 +48,6 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-  bundle-and-verify:
-    name: Build and verify Windows
-    needs: validate-release
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout exact tag
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ needs.validate-release.outputs.tag }}
 
       - name: Setup Node
         uses: actions/setup-node@v5
@@ -72,161 +61,37 @@ jobs:
       - name: Rust cache
         uses: swatinem/rust-cache@v2
 
+      - name: Install Linux dependencies (Tauri)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libsoup-3.0-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Require Windows signing configuration
-        shell: pwsh
+      - name: Validate source policy and repository
         env:
-          WINDOWS_SIGNING_MODE: ${{ vars.WINDOWS_SIGNING_MODE }}
-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-          WINDOWS_EXPECTED_SIGNER_SUBJECT: ${{ vars.WINDOWS_EXPECTED_SIGNER_SUBJECT }}
-          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
+          RELEASE_TAG: ${{ steps.release_tag.outputs.tag }}
         run: |
-          $ErrorActionPreference = "Stop"
-          if ($env:WINDOWS_SIGNING_MODE -ne "pfx") {
-            throw "WINDOWS_SIGNING_MODE must be 'pfx'. Use a provider-specific signCommand for modern cloud/HSM certificates."
-          }
-          foreach ($name in @(
-            "WINDOWS_CERTIFICATE",
-            "WINDOWS_CERTIFICATE_PASSWORD",
-            "WINDOWS_EXPECTED_SIGNER_SUBJECT",
-            "WINDOWS_TIMESTAMP_URL"
-          )) {
-            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($name))) {
-              throw "Missing required GitHub Actions secret or variable: $name"
-            }
-          }
-
-          $timestamp = [Uri]$env:WINDOWS_TIMESTAMP_URL
-          if (-not $timestamp.IsAbsoluteUri -or $timestamp.Scheme -notin @("http", "https")) {
-            throw "WINDOWS_TIMESTAMP_URL must be an absolute HTTP(S) URL from the certificate issuer."
-          }
-
-      - name: Validate source and release metadata
-        env:
-          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
-        run: |
+          npm run check:publish
+          npm run check:release
           npm run check
           npm test
-          npm run check:release
           npm run build:frontend
           cargo check --locked --manifest-path src-tauri/Cargo.toml
           cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
           npm audit
 
-      - name: Import Windows PFX and create runner-only Tauri config
-        shell: pwsh
-        env:
-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-          WINDOWS_EXPECTED_SIGNER_SUBJECT: ${{ vars.WINDOWS_EXPECTED_SIGNER_SUBJECT }}
-          WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          $certificateDirectory = Join-Path $env:RUNNER_TEMP "pi-gui-signing"
-          $encodedPath = Join-Path $certificateDirectory "certificate.txt"
-          $pfxPath = Join-Path $certificateDirectory "certificate.pfx"
-          $imported = @()
-          New-Item -ItemType Directory -Path $certificateDirectory -Force | Out-Null
-          try {
-            [IO.File]::WriteAllText($encodedPath, $env:WINDOWS_CERTIFICATE, [Text.UTF8Encoding]::new($false))
-            certutil -decode $encodedPath $pfxPath | Out-Null
-            if ($LASTEXITCODE -ne 0) { throw "Unable to decode WINDOWS_CERTIFICATE." }
-
-            $password = ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force
-            $imported = @(Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $password)
-            $codeSigningOid = "1.3.6.1.5.5.7.3.3"
-            $signer = $imported | Where-Object {
-              $_.HasPrivateKey -and
-              $_.NotBefore -le (Get-Date) -and
-              $_.NotAfter -gt (Get-Date) -and
-              $_.EnhancedKeyUsageList.ObjectId.Value -contains $codeSigningOid
-            } | Select-Object -First 1
-            if (-not $signer) { throw "The PFX does not contain a currently valid code-signing certificate with a private key." }
-            if ($signer.Subject -ne $env:WINDOWS_EXPECTED_SIGNER_SUBJECT) {
-              throw "Imported signer subject does not match WINDOWS_EXPECTED_SIGNER_SUBJECT."
-            }
-
-            $importedThumbprints = ($imported | ForEach-Object Thumbprint) -join ","
-            "PI_GUI_WINDOWS_IMPORTED_THUMBPRINTS=$importedThumbprints" >> $env:GITHUB_ENV
-            $config = @{
-              bundle = @{
-                windows = @{
-                  certificateThumbprint = $signer.Thumbprint
-                  digestAlgorithm = "sha256"
-                  timestampUrl = $env:WINDOWS_TIMESTAMP_URL
-                }
-              }
-            }
-            $config | ConvertTo-Json -Depth 4 | Set-Content "src-tauri/tauri.release.windows.conf.json" -Encoding utf8NoBOM
-          } catch {
-            foreach ($certificate in $imported) {
-              Remove-Item "Cert:\CurrentUser\My\$($certificate.Thumbprint)" -Force -ErrorAction SilentlyContinue
-            }
-            throw
-          } finally {
-            Remove-Item $certificateDirectory -Recurse -Force -ErrorAction SilentlyContinue
-            $password = $null
-          }
-
-      - name: Build signed Windows bundles
-        run: npm run tauri -- build --bundles nsis,msi --config src-tauri/tauri.release.windows.conf.json
-
-      - name: Verify and stage Windows signatures
-        shell: pwsh
-        env:
-          WINDOWS_EXPECTED_SIGNER_SUBJECT: ${{ vars.WINDOWS_EXPECTED_SIGNER_SUBJECT }}
-        run: |
-          $ErrorActionPreference = "Stop"
-          $application = Get-Item "src-tauri/target/release/pi-gui.exe"
-          $nsis = @(Get-ChildItem "src-tauri/target/release/bundle/nsis" -Filter "*setup.exe")
-          $msi = @(Get-ChildItem "src-tauri/target/release/bundle/msi" -Filter "*.msi")
-          if ($nsis.Count -ne 1 -or $msi.Count -ne 1) {
-            throw "Expected exactly one NSIS installer and one MSI."
-          }
-          $installers = $nsis + $msi
-
-          foreach ($file in @($application) + $installers) {
-            $signature = Get-AuthenticodeSignature $file.FullName
-            if ($signature.Status -ne "Valid") {
-              throw "$($file.Name) signature is $($signature.Status), expected Valid."
-            }
-            if ($signature.SignerCertificate.Subject -ne $env:WINDOWS_EXPECTED_SIGNER_SUBJECT) {
-              throw "$($file.Name) signer does not match WINDOWS_EXPECTED_SIGNER_SUBJECT."
-            }
-            if (-not $signature.TimeStamperCertificate) {
-              throw "$($file.Name) has no trusted timestamp."
-            }
-          }
-
-          $staging = Join-Path $env:RUNNER_TEMP "pi-gui-release"
-          New-Item -ItemType Directory -Path $staging -Force | Out-Null
-          $installers | Copy-Item -Destination $staging
-
-      - name: Upload verified release assets
-        uses: actions/upload-artifact@v4
-        with:
-          name: pi-gui-release-windows
-          if-no-files-found: error
-          retention-days: 7
-          path: ${{ runner.temp }}/pi-gui-release/*
-
-      - name: Remove imported Windows certificate
-        if: always()
-        shell: pwsh
-        run: |
-          foreach ($thumbprint in ($env:PI_GUI_WINDOWS_IMPORTED_THUMBPRINTS -split ",")) {
-            if (-not [string]::IsNullOrWhiteSpace($thumbprint)) {
-              Remove-Item "Cert:\CurrentUser\My\$thumbprint" -Force -ErrorAction SilentlyContinue
-            }
-          }
-          Remove-Item "src-tauri/tauri.release.windows.conf.json" -Force -ErrorAction SilentlyContinue
-
   create-draft:
-    name: Create verified draft release
-    needs: [validate-release, bundle-and-verify]
+    name: Create source-only draft
+    needs: validate-source
     runs-on: ubuntu-22.04
     permissions:
       contents: write
@@ -235,26 +100,13 @@ jobs:
       - name: Checkout release metadata
         uses: actions/checkout@v5
         with:
-          ref: ${{ needs.validate-release.outputs.tag }}
+          ref: ${{ needs.validate-source.outputs.tag }}
 
-      - name: Download verified assets
-        uses: actions/download-artifact@v5
-        with:
-          name: pi-gui-release-windows
-          path: release-assets
-
-      - name: Require complete artifact set
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(find release-assets -maxdepth 1 -name '*setup.exe' -type f | wc -l)" -eq 1
-          test "$(find release-assets -maxdepth 1 -name '*.msi' -type f | wc -l)" -eq 1
-
-      - name: Create or update draft
+      - name: Create or update source-only draft
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ needs.validate-release.outputs.tag }}
+          RELEASE_TAG: ${{ needs.validate-source.outputs.tag }}
         run: |
           set -euo pipefail
           IS_DRAFT="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null || true)"
@@ -263,12 +115,19 @@ jobs:
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
               --draft \
-              --title "Pi GUI $RELEASE_TAG" \
+              --title "Pi GUI $RELEASE_TAG (source only)" \
               --notes-file .github/RELEASE_TEMPLATE.md
           elif [[ "$IS_DRAFT" != "true" ]]; then
             echo "Release $RELEASE_TAG already exists and is not a draft." >&2
             exit 1
+          else
+            ASSET_COUNT="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')"
+            if [[ "$ASSET_COUNT" != "0" ]]; then
+              echo "Source-only draft $RELEASE_TAG has $ASSET_COUNT attached asset(s)." >&2
+              exit 1
+            fi
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Pi GUI $RELEASE_TAG (source only)" \
+              --notes-file .github/RELEASE_TEMPLATE.md
           fi
-          gh release upload "$RELEASE_TAG" release-assets/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber

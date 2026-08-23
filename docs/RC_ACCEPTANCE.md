@@ -4,7 +4,7 @@ Last updated: 2026-08-23.
 
 ## Scope and decision boundary
 
-Phase 9 stabilizes the existing `0.1.0` feature set. It does not add a new product surface, create a tag or GitHub Release, weaken release gates, or configure signing credentials. The candidate remains unpublished and its Windows installers remain blocked from public distribution while `NotSigned`.
+Phase 9 stabilized the existing `0.1.0` feature set. It did not add a new product surface, create a tag or GitHub Release, weaken release gates, or configure signing credentials. This is a historical acceptance record; the later maintainer decision to publish source only permanently keeps these Windows installers outside the supported distribution boundary regardless of signature state.
 
 This record distinguishes four evidence levels:
 
@@ -97,9 +97,9 @@ The clean-machine job passed dependency install, candidate validation, Windows b
 
 This is unsigned lifecycle evidence, not permission to publish the installers. No tag or GitHub Release was created.
 
-## Remaining release gates
+## Remaining source release gates
 
-- Configure a trusted Windows signing identity outside Git.
-- Produce signed Windows draft assets from the exact intended tag and pass Signed Windows Release Smoke.
-- Keep cross-version Windows upgrade marked N/A only for `0.1.0`; it becomes mandatory once an earlier Pi GUI release exists.
+- Merge the source-only policy and pass deterministic/privacy checks on the exact intended source commit.
+- Create a zero-asset draft from the exact tag and verify that only GitHub-generated source archives are present.
+- Keep Windows lifecycle runs as optional engineering evidence; do not upload their temporary installers.
 - Do not create or publish a tag/Release until the maintainer explicitly starts that separate release step.

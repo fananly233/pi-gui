@@ -161,7 +161,7 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Windows `0.1.0` bundles | PASS WITH EXISTING LINKER INFO | The current candidate rebuild produced a 4,190,762-byte NSIS installer and a 6,021,120-byte MSI. Only the existing localized MSVC import-library linker message was emitted. |
 | Generated installer policy | PASS | NSIS is current-user with bundle ID `com.pi.gui`; MSI is per-machine; both use `0.1.0`; downgrades are blocked; WiX uses `bc684a49-735f-5100-8ea3-5bb516c8f702`. |
 | MSI administrative extraction and isolated launch | PASS, NOT CLEAN-MACHINE | The MSI contained `pi-gui.exe`, and the extracted binary stayed alive for eight seconds under isolated app-data environment variables. No installer was run on the development machine. |
-| Windows Authenticode | BLOCKED | Main EXE, NSIS, and MSI all report `NotSigned`; the signed-release workflow rejects this state. |
+| Windows Authenticode | BLOCKED | Main EXE, NSIS, and MSI all reported `NotSigned`; at that phase the signed-release workflow rejected this state, and no installer was published. |
 | GitHub-hosted clean-machine lifecycle | PASS | [Run 32650837760](https://github.com/fananly233/pi-gui/actions/runs/32650837760) built commit `03d064b` on a fresh Windows runner. The NSIS lifecycle passed install, first launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation; cross-version upgrade was skipped because no prior Pi GUI release exists. |
 | Read-only MCO release Scout | UNAVAILABLE | MCO failed on Windows with `module 'os' has no attribute 'getuid'`; no Scout conclusion was used. |
 | Public documentation refresh | PASS | README now introduces Pi GUI, preserves both donor attributions, and documents source install, first use, current limits, data handling, validation, and release status. Inherited Gustav release/package/slash/extension-UI claims were removed from active docs; six donor-only issue/development logs remain local and ignored. |
@@ -189,7 +189,18 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | PR #1 integration | PASS | The active two-parent merge `3bb7cc411467fece7d5dbe5edf083d78a836a456` has base `4147e6a48142a63ad701dec0d13b7a659ca3b2b9`, reviewed head `ef758c0ab7e24724de50db71cba8655918770577`, and the exact reviewed source tree. The RC branch was retained. |
 | Mainline deterministic and native gates | PASS | TypeScript, 26 renderer/domain tests, frontend build, Cargo format/check, 25 Rust tests, npm audit, release metadata, publish safety, all five real-Pi/runtime gates, and isolated native startup/window/theme/close checks passed. |
 | Mainline hosted lifecycle | PASS | [CI 32664955474](https://github.com/fananly233/pi-gui/actions/runs/32664955474) and [Windows Clean-Machine Candidate 32665181610](https://github.com/fananly233/pi-gui/actions/runs/32665181610) passed for `3bb7cc411467fece7d5dbe5edf083d78a836a456`. |
-| Release boundary | BLOCKED | The hosted candidate is still unsigned. No signing credential, tag, draft, or Release was created; Signed Windows Release Smoke remains pending. |
+| Release boundary | BLOCKED | At Phase 10A the hosted candidate was unsigned. No signing credential, tag, draft, or Release was created, and Signed Windows Release Smoke had not run. |
+
+## Phase 10B source-only distribution decision (2026-08-23)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Maintainer distribution decision | PASS | Pi GUI will publish source code only. Official installers, application bundles, package-manager binaries, and updater payloads are out of scope. |
+| Release workflow boundary | PASS | The exact-tag workflow creates only a zero-asset source draft; binary builds, signing inputs, artifact uploads, and release-asset uploads were removed. |
+| Tag namespace isolation | PASS | Pi GUI source releases use `pi-gui-v*`; inherited donor `v*` tags stay local and must never be pushed with `--tags`, `--all`, or `--mirror`. |
+| Clean-machine boundary | PASS | Windows lifecycle QA still builds and tests ephemeral installers but no longer downloads prior Release installers or uploads current outputs. |
+| Signing and identity exposure | NOT APPLICABLE | No signing identity or credential is required or configured because no official binary is distributed. |
+| Publication state | NOT RUN | No tag, draft, or Release was created by the policy change. Publication remains a separate explicit maintainer action. |
 
 ## Migration decisions
 

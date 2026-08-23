@@ -2,9 +2,9 @@
 
 ## Supported versions
 
-Pi GUI `0.1.0` is an unpublished candidate. The source repository is public, but there is no supported release line yet and locally generated unsigned installers are not public release artifacts.
+Pi GUI `0.1.0` is an unpublished source-only candidate. The source repository is public, and locally or ephemerally generated applications/installers are not official release artifacts.
 
-This section will list supported versions after signing and clean-machine release gates are operational.
+This section will list supported source tags after the first source-only Release is published. Pi GUI does not currently provide a supported binary distribution line.
 
 ## Reporting a vulnerability
 

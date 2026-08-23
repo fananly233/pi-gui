@@ -13,14 +13,15 @@ First Pi GUI release candidate. This version is an independently modified deriva
 - React 19 renderer on the existing Tauri 2/Rust host.
 - Real Pi RPC chat, sessions, models, authentication metadata, workspace files, image attachments, native terminal, typed Git/worktree flows, and Pi ecosystem management.
 - Versioned app-owned Pi runtime installation with published SHA-256 verification, transactional activation, rollback, recovery, and an explicit system-Pi fallback.
-- Release metadata validation and a clean-machine Windows installer lifecycle gate.
+- Source-release metadata validation and an ephemeral clean-machine Windows installer lifecycle gate.
 - A pre-push publish-safety gate for common secrets, private configuration filenames, local paths, current-branch history, commit email metadata, remote credentials, and derivative-work attribution.
 
 ### Changed
 
 - Product identity is `Pi GUI` / `pi-gui` / `com.pi.gui`, versioned independently from the donor repositories.
 - Windows NSIS uses current-user scope, downgrades are disabled, and the WiX upgrade identity is fixed.
-- Cross-platform release automation now creates drafts until signing and clean-machine verification are complete.
+- Release automation now validates an exact tag and creates a source-only draft with zero attached assets.
+- Windows clean-machine engineering checks no longer upload their temporary installer outputs.
 - Public documentation now describes the Pi GUI React/Tauri feature boundary and first-use flow instead of inheriting Gustav release, package-gallery, slash-command, and extension-UI claims.
 
 ### Fixed
@@ -34,7 +35,7 @@ First Pi GUI release candidate. This version is an independently modified deriva
 
 - Electron host code, unrestricted shell execution, general renderer filesystem access, and WebView-controlled runtime executables/environments are excluded.
 - Refreshed the locked Vite 7 build chain to versions with zero current npm audit findings.
-- Public Windows release smoke requires valid Authenticode signatures.
+- Source-release policy checks reject binary release workflows, signing configuration, and installer artifact uploads.
 - Local credential/signing/app-state files and the migration control prompt are explicitly ignored; future commits use the connected GitHub account's noreply identity.
 - Real-Pi gates copy only the minimum required configuration into disposable directories and verify that the real Pi auth/settings state remains unchanged.
 
