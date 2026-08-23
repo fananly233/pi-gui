@@ -1,12 +1,12 @@
 # Pi CLI → Pi GUI Feature Mapping
 
-This document describes the code that exists on `feat/tauri-react-migration` after Phase 8 and the first release-preparation pass. It intentionally does not count inherited Gustav UI claims that are not present in the React renderer.
+This document describes the current Pi GUI `0.1.0` candidate after Phase 9 RC stabilization. It intentionally does not count inherited Gustav UI claims that are not present in the React renderer.
 
 ## Foundation
 
 | Pi capability | Desktop status |
 | --- | --- |
-| `pi --mode rpc` JSONL protocol | ✅ Rust owns one process per loaded session; the React `PiAdapter` correlates strict LF-delimited requests and events. |
+| `pi --mode rpc` JSONL protocol | ✅ Rust owns one process per loaded session; the React `PiAdapter` correlates strict LF-delimited requests and events and completes startup only after a real `get_state` response. |
 | Pi discovery | ✅ Desktop-managed version → bundled sidecar → existing system Pi fallback. Advanced system mode accepts a native-validated executable path or PATH discovery. |
 | Process lifecycle | ✅ RPC, terminal, and package-operation children are owned and stopped on window/application exit; runtime maintenance is serialized and refuses active RPC sessions. |
 | Electron host/preload | ❌ Deliberately absent. Tauri commands are the native boundary. |
@@ -58,7 +58,7 @@ This document describes the code that exists on `feat/tauri-react-migration` aft
 | --- | --- |
 | Terminal | ✅ Lazy xterm renderer backed by an owned native PTY. |
 | Git status and diff | ✅ Typed native commands with bounded diff output. |
-| Worktree list/create/use/remove | ✅ Adjacent destinations and guards for main/current/dirty/locked/prunable worktrees. |
+| Worktree list/create/use/remove | ✅ Adjacent destinations and guards for main/current/dirty/locked/prunable worktrees. Switching and removal use awaited native, fail-closed confirmation dialogs. |
 | Arbitrary Git or shell command bridge | ❌ Deliberately absent. |
 | Stage/commit/fetch/push/reset | ⏸️ Not part of the current coding-workflow subset. |
 
@@ -105,7 +105,7 @@ Package operations are serialized, capped at 512 KiB of captured output, limited
 
 ## Remaining release work
 
-The first GitHub-hosted Windows lifecycle passed for `582c662`, including install, launch, same-version update/reinstall, uninstall cleanup, and app-data preservation. Cross-version upgrade remains not applicable until an earlier Pi GUI release exists.
+The first GitHub-hosted Windows lifecycle passed for `03d064b`, including install, launch, same-version update/reinstall, uninstall cleanup, and app-data preservation. Phase 9 changes have local deterministic, real-Pi, and native acceptance evidence; the hosted lifecycle must be rerun for the stabilized candidate before release. Cross-version upgrade remains not applicable until an earlier Pi GUI release exists.
 
 - Re-run `npm run check:publish` on every release-facing commit before pushing it to the independent repository.
 - Configure Windows signing and macOS signing/notarization, then pass the signed cross-platform release-smoke workflow.

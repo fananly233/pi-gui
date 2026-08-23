@@ -18,7 +18,7 @@ Recorded on Windows on 2026-08-23:
 - only the reviewed Pi GUI history was pushed to `origin/main`; the generated one-file remote root was replaced with an exact lease after its `fananly` MIT copyright line was retained in `LICENSE`, and its original commit remains recoverable from a local bundle;
 - GitHub private vulnerability reporting is enabled and was verified through the dedicated repository API.
 
-`npm run check:publish` now passes across 144 tracked/non-ignored candidate files. It automates the content/history/metadata/remote/attribution checks and redacts suspected values from its output.
+`npm run check:publish` now passes across 150 tracked/non-ignored candidate files. It automates the content/history/metadata/remote/attribution checks and redacts suspected values from its output.
 
 The 2026-08-23 GitHub Actions signing audit found zero repository secrets, zero repository variables, and zero environments. Real Windows and Apple identities still have to be configured outside Git. Certificate files and the runner-only Windows signing config are ignored by exact release-safety rules.
 
@@ -74,12 +74,14 @@ The PowerShell lifecycle script refuses to install outside the authorized GitHub
 
 Recorded on Windows on 2026-08-23:
 
+Phase 9 source stabilization has passed the local deterministic, five real-Pi/runtime, and native Tauri acceptance matrix recorded in [RC_ACCEPTANCE.md](./RC_ACCEPTANCE.md). The bundle hashes and hosted lifecycle below were produced from the earlier release-hardening source `03d064b`; they are historical baseline evidence and must not be reused as final Phase 9 artifact evidence. Final bundles, CI, and the hosted Windows lifecycle remain pending for the stabilized candidate.
+
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Release identity and tag | PASS | `check:release` accepted `v0.1.0` and matched npm, lockfile, Cargo, Tauri, HTML, and Linux metainfo. |
 | Pi GUI icon identity | PASS | The inherited `DESK` wordmark/source filename was replaced with a deterministic `GUI` pixel mark and the complete Tauri icon set was regenerated. |
-| TypeScript and renderer tests | PASS | Strict check plus 19 deterministic tests. |
-| Rust check and library tests | PASS | `cargo check --locked` passes. The real PTY test now waits until the shell emits DSR before replying with CPR, and a separate Windows test exercises the explicit `cmd.exe` fallback. The selected PowerShell path and `cmd.exe` each passed six independent test-process runs; the final serial library run passed 24 tests with one network gate ignored. The production React/xterm path was unchanged. |
+| TypeScript and renderer tests | PASS | Strict check plus 23 deterministic tests, including real-gate isolation, RPC readiness, and native-confirmation safety contracts. |
+| Rust check and library tests | PASS | `cargo check --locked` passes. The real PTY test waits until the shell emits DSR before replying with CPR, and a separate Windows test exercises the explicit `cmd.exe` fallback. The current serial library run passed 25 tests with one managed-runtime network gate ignored. |
 | Frontend production build | PASS | 320 modules built. |
 | Full dependency audit | PASS | Zero reported production or development dependency vulnerabilities after updating the locked Vite 7 toolchain within its existing major version. |
 | Windows bundle build | PASS WITH LINKER INFO | Rebuilt the Pi GUI-branded candidate as a 4,188,902-byte NSIS installer and a 6,021,120-byte MSI. The only Rust warning was the localized MSVC import-library linker message. |
@@ -88,13 +90,13 @@ Recorded on Windows on 2026-08-23:
 | Windows signatures | BLOCKED | Main EXE, NSIS, and MSI all report `NotSigned`. |
 | Hosted clean-machine lifecycle | PASS | [Run 32650837760](https://github.com/fananly233/pi-gui/actions/runs/32650837760) built `03d064b` on a fresh Windows runner. Install, first launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation all passed. Cross-version upgrade was skipped because no earlier Pi GUI release exists. |
 
-Local candidate SHA-256 values:
+Pre-Phase9 local bundle SHA-256 values (historical; rebuild before release):
 
 - `pi-gui.exe` (17,406,464 bytes): `13B01F9C21C2432818F69D7A62BFECF8543AF8929A95DDAFD2189566ECA481EF`
 - `Pi GUI_0.1.0_x64-setup.exe` (4,188,902 bytes): `4FA8AF048399FBBF235FD209DAD27D58DBF5749A264AD357A930EF4BDED41157`
 - `Pi GUI_0.1.0_x64_en-US.msi` (6,021,120 bytes): `5952758A13B941E2951BEA3D76C3640FF31179CC6C32AAC75E7BCA7E762409BE`
 
-Hosted evidence:
+Pre-Phase9 hosted evidence:
 
 - source commit: `03d064bf1931b7df003dac4f519a392d0d68a185`;
 - [CI run 32650824513](https://github.com/fananly233/pi-gui/actions/runs/32650824513): PASS;
@@ -151,9 +153,11 @@ Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive
 
 ## Evidence checklist
 
-- Commit SHA and tag: `03d064bf1931b7df003dac4f519a392d0d68a185`; no release tag yet.
-- CI run URL: [32650824513](https://github.com/fananly233/pi-gui/actions/runs/32650824513), PASS.
-- Windows clean-machine run URL: [32650837760](https://github.com/fananly233/pi-gui/actions/runs/32650837760), PASS.
+- Phase 9 final commit SHA and tag: PENDING final documentation commit; no release tag exists.
+- Phase 9 CI and Windows clean-machine run URLs: PENDING branch push and workflow completion.
+- Previous hosted baseline commit: `03d064bf1931b7df003dac4f519a392d0d68a185`.
+- Previous CI run URL: [32650824513](https://github.com/fananly233/pi-gui/actions/runs/32650824513), PASS.
+- Previous Windows clean-machine run URL: [32650837760](https://github.com/fananly233/pi-gui/actions/runs/32650837760), PASS.
 - Signed release-smoke run URL: NOT RUN; no signed draft assets exist.
 - Windows NSIS/MSI signer and signature status: no signer; `NotSigned`.
 - macOS signing identity and notarization result: NOT CONFIGURED / NOT RUN.
@@ -163,4 +167,4 @@ Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive
 - Cross-version upgrade result or first-release N/A justification: N/A because there is no earlier Pi GUI release with the same upgrade identity.
 - Uninstall result: PASS; executable, install directory, shortcuts, and uninstall registry key were removed.
 - App-data preservation result: PASS across update/reinstall and default uninstall.
-- Known issues: the repository has no signing secrets or variables; Windows provider credentials and Apple Developer credentials are not configured, so draft creation, public installer distribution, and signed release smoke remain blocked.
+- Known issues: Phase 9 hosted lifecycle evidence is pending; the repository has no signing secrets or variables; Windows provider credentials and Apple Developer credentials are not configured, so draft creation, public installer distribution, and signed release smoke remain blocked.

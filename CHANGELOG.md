@@ -23,12 +23,20 @@ First Pi GUI release candidate. This version is an independently modified deriva
 - Cross-platform release automation now creates drafts until signing and clean-machine verification are complete.
 - Public documentation now describes the Pi GUI React/Tauri feature boundary and first-use flow instead of inheriting Gustav release, package-gallery, slash-command, and extension-UI claims.
 
+### Fixed
+
+- Replaced WebView `window.confirm` calls with awaited Tauri-native, fail-closed confirmations so cancelling a worktree, package, or unsaved-file action cannot execute it early.
+- Added a real RPC `get_state` startup handshake with an extended initialization window for configured Pi packages, plus cleanup when startup fails.
+- Refresh model/auth state when an existing runtime transitions to ready instead of requiring a full application restart.
+- Added absolute, non-root native app-data overrides for isolated desktop acceptance runs without writing to the normal application profile.
+
 ### Security
 
 - Electron host code, unrestricted shell execution, general renderer filesystem access, and WebView-controlled runtime executables/environments are excluded.
 - Refreshed the locked Vite 7 build chain to versions with zero current npm audit findings.
 - Public Windows release smoke requires valid Authenticode signatures.
 - Local credential/signing/app-state files and the migration control prompt are explicitly ignored; future commits use the connected GitHub account's noreply identity.
+- Real-Pi gates copy only the minimum required configuration into disposable directories and verify that the real Pi auth/settings state remains unchanged.
 
 ## Inherited Gustav history
 

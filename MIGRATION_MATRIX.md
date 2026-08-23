@@ -162,12 +162,25 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Generated installer policy | PASS | NSIS is current-user with bundle ID `com.pi.gui`; MSI is per-machine; both use `0.1.0`; downgrades are blocked; WiX uses `bc684a49-735f-5100-8ea3-5bb516c8f702`. |
 | MSI administrative extraction and isolated launch | PASS, NOT CLEAN-MACHINE | The MSI contained `pi-gui.exe`, and the extracted binary stayed alive for eight seconds under isolated app-data environment variables. No installer was run on the development machine. |
 | Windows Authenticode | BLOCKED | Main EXE, NSIS, and MSI all report `NotSigned`; the signed-release workflow rejects this state. |
-| GitHub-hosted clean-machine lifecycle | PASS | [Run 32648611161](https://github.com/fananly233/pi-gui/actions/runs/32648611161) built commit `582c662` on a fresh Windows runner. The NSIS lifecycle passed install, first launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation; cross-version upgrade was skipped because no prior Pi GUI release exists. |
+| GitHub-hosted clean-machine lifecycle | PASS | [Run 32650837760](https://github.com/fananly233/pi-gui/actions/runs/32650837760) built commit `03d064b` on a fresh Windows runner. The NSIS lifecycle passed install, first launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation; cross-version upgrade was skipped because no prior Pi GUI release exists. |
 | Read-only MCO release Scout | UNAVAILABLE | MCO failed on Windows with `module 'os' has no attribute 'getuid'`; no Scout conclusion was used. |
 | Public documentation refresh | PASS | README now introduces Pi GUI, preserves both donor attributions, and documents source install, first use, current limits, data handling, validation, and release status. Inherited Gustav release/package/slash/extension-UI claims were removed from active docs; six donor-only issue/development logs remain local and ignored. |
 | Candidate content and `HEAD` secret scan | PASS | 143 tracked/non-ignored candidate files and the current branch history have no detected common key/token/private-key/credential-URL or current-machine home-path hits. The local migration prompt remains ignored and absent from history. |
 | Donor archive isolation | PASS WITH PUSH RESTRICTION | A static self-signed smoke key and credential-URL rejection fixtures exist only in local `archive/electron-mvp`, not in `HEAD`. The archive must remain local; `git push --all` and `--mirror` are prohibited. |
 | Post-fork commit identity | PASS | After explicit maintainer approval, all 26 derivative commits were rewritten to the connected public GitHub identity and noreply author/committer email. Commit count, linear topology, subjects, dates, and the final tree were unchanged; only derivative SHAs changed. |
+
+## Phase 9 RC stabilization verification (2026-08-23, Windows)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| Deterministic source gates | PASS | Release metadata, TypeScript, frontend build, 23 renderer/domain tests, Cargo format/check, 25 Rust tests, full npm audit, and publish-safety checks passed. One explicit managed-runtime network test remains ignored by the deterministic suite. |
+| Five real integration gates | PASS | Pi RPC, sessions, models, ecosystem, and managed-runtime gates passed with Pi 0.84.2. Mutable state stayed under disposable roots and the real Pi auth/settings hashes remained unchanged. |
+| Native chat/session/file matrix | PASS | Real Tauri UI covered text/thinking/tool streaming, abort/second prompt, restore/rename/fork/switch, file edit/mention/image, stale-write refusal, binary refusal, and models/auth after ready transition. |
+| PTY, Git, ecosystem, and runtime matrix | PASS | Real PowerShell PTY lifecycle, Git status/diff/worktree creation, resource inventory, system-Pi fallback, maintenance guard, theme/window controls, and shutdown cleanup passed. No shell command was typed through UI automation. |
+| Native confirmation regression | PASS | Cancelling both worktree switch and clean removal preserved the active session/workspace and left the worktree registered and present on disk. All affected renderer callers now await a fail-closed Tauri-native dialog. |
+| Native data isolation | PASS | `PI_GUI_DATA_DIR` and the Windows WebView2 profile were redirected to disposable roots. Diagnostics showed only the isolated runtime path; normal runtime and Pi config hashes/timestamps remained unchanged; no test-root process survived shutdown. |
+| Hosted lifecycle for Phase 9 tip | PENDING | The earlier `03d064b` hosted lifecycle remains valid historical evidence but does not cover the Phase 9 code changes. CI and Windows Clean-Machine Candidate must rerun after the stabilization branch is pushed. |
+| Signing and public release | BLOCKED | Windows artifacts remain unsigned; Apple identities are not configured; no tag, draft, or Release was created. |
 
 ## Migration decisions
 

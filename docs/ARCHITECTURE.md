@@ -48,7 +48,7 @@ Each loaded session has its own Pi RPC process. The frontend tracks a stable ses
 
 A monotonic selection guard makes the latest workspace/session selection win. Message, activity, model, and thinking state stay attached to that session. Disconnect, panel shutdown, window close, and application exit drain owned RPC/PTY/package child processes.
 
-RPC transport is strict LF-delimited JSONL. The adapter handles delta-only message updates, authoritative message-end reconciliation, tool lifecycle events, abort, and the steer/follow-up gate without a mock agent.
+RPC transport is strict LF-delimited JSONL. After Rust spawns Pi, the adapter waits for a real correlated `get_state` response before exposing the session as ready; configured package initialization can therefore finish without racing the first user action. The adapter handles delta-only message updates, authoritative message-end reconciliation, tool lifecycle events, abort, and the steer/follow-up gate without a mock agent.
 
 ## Data ownership
 
@@ -61,6 +61,8 @@ RPC transport is strict LF-delimited JSONL. The adapter handles delta-only messa
 | Workspace files and Git repository | User-selected workspace |
 
 Credential values, prompts, model output, and environment variables are excluded from runtime diagnostics and lifecycle logs.
+
+Native acceptance tests may set `PI_GUI_DATA_DIR` to an absolute, non-root disposable directory so Rust app data does not touch the normal profile. Windows tests also set WebView2's `WEBVIEW2_USER_DATA_FOLDER` to a disposable directory. These are host-side test-isolation controls, not renderer capabilities or normal user configuration.
 
 ## Models and authentication
 
@@ -89,5 +91,7 @@ Runtime maintenance is serialized and refused while RPC sessions are active. Pre
 ## Security and product boundary
 
 Pi GUI intentionally excludes Electron main/preload/agent-host code, Browser Agent, Channels, unrestricted shell execution, arbitrary Git commands, general renderer filesystem access, and silent runtime updates.
+
+Destructive or trust-changing renderer actions use awaited Tauri-native confirmation dialogs. A dialog failure resolves as cancellation, so a WebView modal quirk cannot execute the action early.
 
 See `docs/PERMISSIONS.md` for the native authority boundary and `FEATURE_MAPPING.md` for the exact implemented/unsupported feature list.
