@@ -53,10 +53,13 @@ Recorded on 2026-08-23:
 
 - Phase 9 passed deterministic checks, all five real Pi/runtime gates, isolated native acceptance, and a GitHub-hosted Windows lifecycle run for `867ac378a0eaab9c55c38daecea81b1491b357d2`.
 - Phase 10A merged [PR #1](https://github.com/fananly233/pi-gui/pull/1) as `3bb7cc411467fece7d5dbe5edf083d78a836a456`; its tree matches the reviewed PR head. [Mainline CI](https://github.com/fananly233/pi-gui/actions/runs/32664955474) and the [Windows lifecycle run](https://github.com/fananly233/pi-gui/actions/runs/32665181610) passed.
+- Phase 10B merged [PR #2](https://github.com/fananly233/pi-gui/pull/2) as the active two-parent merge `26ca58662b33d0f8c85d5ca54a400b79557e2765`; its tree matches the reviewed source-policy head. [Mainline CI #19](https://github.com/fananly233/pi-gui/actions/runs/32672786127) passed with no artifacts.
+- Phase 10C [Windows clean-machine run #7](https://github.com/fananly233/pi-gui/actions/runs/32672896200) passed candidate validation, ephemeral installer build, MSI extraction, and the NSIS install/launch/update/uninstall lifecycle for active `main`. The run uploaded no artifact.
 - `npm run check:publish` found no common credential/private-key pattern, tracked private-config filename, current-machine home path, credential-bearing remote, or missing derivative-work attribution in the reviewed branch.
 - The maintainer accepts the immutable metadata-only residual in GitHub's PR #1 record. Active mainline commits use the approved public GitHub identity and noreply email metadata.
+- GitHub initially generated PR #2's merge object with non-approved author-email metadata. The active `main` ref was immediately replaced with the same reviewed tree and parents using the approved public noreply identity. GitHub's immutable PR record may retain the superseded merge-object reference, but it is not the active mainline commit.
 - The earlier signing-route audit found no configured repository signing secrets or variables and did not create or access signing credentials.
-- Earlier clean-machine runs temporarily uploaded unsigned Actions artifacts as historical QA evidence. The source-only workflow revision stops all future installer artifact uploads; those historical files were never Pi GUI Release assets.
+- Earlier clean-machine runs temporarily uploaded three unsigned Actions artifacts as historical QA evidence. Phase 10C permanently deleted artifact IDs `9496313691`, `9498181296`, and `9499997749`; GitHub now reports an empty artifact list for all three source runs while retaining their workflow logs. The source-only workflow revision prevents future installer artifact uploads, and none of these files was ever a Pi GUI Release asset.
 
 The detailed Phase 9 evidence remains in [RC_ACCEPTANCE.md](./RC_ACCEPTANCE.md). Historical unsigned hashes and signature observations identify tested local bytes only and do not define supported downloads.
 

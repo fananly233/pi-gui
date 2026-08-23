@@ -21,6 +21,7 @@ Pi GUI `0.1.0` is a source-only release candidate. A public Release may contain 
 - [x] Remote URLs contain no embedded credentials.
 - [x] Only reviewed Pi GUI history is pushed; `archive/electron-mvp` remains local.
 - [x] The maintainer accepts PR #1's immutable metadata-only residual.
+- [x] The three historical unsigned installer artifacts were permanently deleted while their workflow runs and logs were retained.
 
 ## 3. Deterministic source gate
 
@@ -52,7 +53,7 @@ npm run gate:ecosystem-real
 npm run gate:runtime-real
 ```
 
-The Phase 9 and Phase 10A records establish the current real-Pi, native Tauri, and clean-machine baseline. A documentation/workflow-only source-policy change does not require rerunning mutable integration gates, but it must not claim new runtime evidence.
+The Phase 9 and Phase 10A records establish the real-Pi and native Tauri baseline. Phase 10C revalidated the source-policy merge through mainline CI and an artifact-free hosted clean-machine lifecycle. A documentation/workflow-only source-policy change does not require rerunning mutable real-Pi/runtime gates, but it must not claim new real-Pi/runtime evidence.
 
 ## 5. Source-only automation
 
