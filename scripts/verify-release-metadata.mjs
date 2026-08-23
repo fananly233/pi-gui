@@ -10,6 +10,26 @@ function requireMatch(value, expected, label) {
 	}
 }
 
+function requireIncludes(value, expected, label) {
+	if (!value.includes(expected)) {
+		throw new Error(`${label}: missing ${JSON.stringify(expected)}`);
+	}
+}
+
+function requireOrder(value, markers, label) {
+	let previousIndex = -1;
+	for (const marker of markers) {
+		const index = value.indexOf(marker);
+		if (index < 0) {
+			throw new Error(`${label}: missing ${JSON.stringify(marker)}`);
+		}
+		if (index <= previousIndex) {
+			throw new Error(`${label}: ${JSON.stringify(marker)} is out of order`);
+		}
+		previousIndex = index;
+	}
+}
+
 const packageJson = readJson("package.json");
 const packageLock = readJson("package-lock.json");
 const tauriConfig = readJson("src-tauri/tauri.conf.json");
@@ -20,6 +40,7 @@ const iconSourcePath = "assets/branding/pi-gui-icon.svg";
 const inheritedIconSourcePath = "assets/branding/pi-desktop-icon.svg";
 const releaseWorkflow = fs.readFileSync(".github/workflows/release.yml", "utf8");
 const releaseSmokeWorkflow = fs.readFileSync(".github/workflows/release-smoke.yml", "utf8");
+const gitignore = fs.readFileSync(".gitignore", "utf8");
 const repositoryUrl = "https://github.com/fananly233/pi-gui";
 
 requireMatch(packageJson.name, "pi-gui", "npm package name");
@@ -47,6 +68,16 @@ requireMatch(
 	tauriConfig.bundle.windows.wix.upgradeCode,
 	"bc684a49-735f-5100-8ea3-5bb516c8f702",
 	"WiX upgrade code",
+);
+for (const property of ["certificateThumbprint", "timestampUrl", "signCommand"]) {
+	if (Object.hasOwn(tauriConfig.bundle.windows, property)) {
+		throw new Error(`checked-in Tauri config must not define Windows signing property: ${property}`);
+	}
+}
+requireIncludes(
+	gitignore,
+	"src-tauri/tauri.release.windows.conf.json",
+	"runner-only Windows signing config ignore rule",
 );
 
 const cargoName = cargoToml.match(/^name = "([^"]+)"/m)?.[1];
@@ -89,10 +120,31 @@ if (!iconSource.includes("GUI wordmark") || iconSource.includes("DESK wordmark")
 	throw new Error("Pi GUI icon source does not contain the reviewed GUI wordmark");
 }
 
-const windowsVerification = releaseWorkflow.indexOf("Verify and stage Windows signatures");
-const draftCreation = releaseWorkflow.indexOf("Create or update draft");
-if (windowsVerification < 0 || draftCreation < 0 || windowsVerification > draftCreation) {
-	throw new Error("signed-release workflow must verify Windows before draft creation");
+requireOrder(
+	releaseWorkflow,
+	[
+		"Require Windows signing configuration",
+		"Validate source and release metadata",
+		"Import Windows PFX and create runner-only Tauri config",
+		"Build signed Windows bundles",
+		"Verify and stage Windows signatures",
+		"Upload verified release assets",
+		"Create or update draft",
+	],
+	"signed-release workflow",
+);
+for (const marker of [
+	'WINDOWS_SIGNING_MODE -ne "pfx"',
+	"WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}",
+	"WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}",
+	"WINDOWS_EXPECTED_SIGNER_SUBJECT: ${{ vars.WINDOWS_EXPECTED_SIGNER_SUBJECT }}",
+	"WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}",
+	'certificateThumbprint = $signer.Thumbprint',
+	'timestampUrl = $env:WINDOWS_TIMESTAMP_URL',
+	"--bundles nsis,msi --config src-tauri/tauri.release.windows.conf.json",
+	"needs: [validate-release, bundle-and-verify]",
+]) {
+	requireIncludes(releaseWorkflow, marker, "legacy exportable-PFX release route");
 }
 for (const marker of ["Verify and stage macOS", "Verify and stage Linux", "pi-gui-release-macos", "pi-gui-release-linux"]) {
 	if (releaseWorkflow.includes(marker)) {
@@ -107,10 +159,23 @@ for (const marker of ["smoke-macos:", "smoke-linux:"]) {
 if (!releaseSmokeWorkflow.includes("smoke-windows:")) {
 	throw new Error("Windows-only 0.1.0 smoke workflow is missing smoke-windows");
 }
+requireOrder(
+	releaseSmokeWorkflow,
+	[
+		"Download current release assets",
+		"Require valid Windows signatures",
+		"Verify MSI contents",
+		"Verify NSIS lifecycle",
+	],
+	"signed Windows release smoke workflow",
+);
+requireIncludes(releaseSmokeWorkflow, "RequireSignature = $true", "signed Windows lifecycle gate");
 
 const releaseTag = process.env.RELEASE_TAG?.trim();
 if (releaseTag) {
 	requireMatch(releaseTag, `v${packageJson.version}`, "release tag");
 }
 
-console.log(`RELEASE_METADATA=PASS name=${packageJson.name} version=${packageJson.version} id=${tauriConfig.identifier}`);
+console.log(
+	`RELEASE_METADATA=PASS name=${packageJson.name} version=${packageJson.version} id=${tauriConfig.identifier} signingRoute=legacy-exportable-pfx credentials=not-read`,
+);
