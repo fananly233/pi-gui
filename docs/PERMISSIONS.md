@@ -1,6 +1,6 @@
 # Permissions and Security Notes
 
-Pi Desktop uses Tauri 2 capabilities to function as a local coding-agent host.
+Pi GUI uses Tauri 2 capabilities to function as a local coding-agent host.
 
 Current capability file:
 - `src-tauri/capabilities/default.json`

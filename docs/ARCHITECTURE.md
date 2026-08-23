@@ -4,7 +4,7 @@ This document explains the **product architecture** (not deep code internals).
 
 ## Mental model
 
-Pi Desktop is a 3-layer system:
+Pi GUI is a 3-layer system:
 
 1. **Desktop host (this app)**
 2. **Pi CLI runtime (`pi --mode rpc`)**
@@ -12,7 +12,7 @@ Pi Desktop is a 3-layer system:
 
 ```text
 User
-  -> Pi Desktop UI (React + Tauri shell)
+  -> Pi GUI UI (React + Tauri shell)
     -> RPC bridge (stdin/stdout)
       -> pi --mode rpc runtime
         -> packages/extensions/skills/prompts/themes
@@ -22,7 +22,7 @@ User
 
 ## Layer responsibilities
 
-## 1) Desktop host (Pi Desktop)
+## 1) Desktop host (Pi GUI)
 
 Owns:
 - windowing, panes, tabs, sidebar
@@ -41,7 +41,7 @@ Owns:
 - tool execution pipeline
 - package loading and runtime behavior
 
-Pi Desktop talks to this runtime through the typed frontend adapter in `src/pi/pi-adapter.ts` and the Tauri/Rust process bridge in `src-tauri/src/lib.rs`.
+Pi GUI talks to this runtime through the typed frontend adapter in `src/pi/pi-adapter.ts` and the Tauri/Rust process bridge in `src-tauri/src/lib.rs`.
 
 ## 3) Packages/extensions
 
@@ -57,7 +57,7 @@ This keeps the desktop shell generic and maintainable.
 
 - Keep app-core work focused on **UI polish + performance + reliability**.
 - Add new user-facing workflows through **packages/extensions first** whenever possible.
-- Treat Pi Desktop as a **capability host** (`ctx.ui`, native shell bridge), not a hardcoded workflow layer.
+- Treat Pi GUI as a **capability host** (`ctx.ui`, native shell bridge), not a hardcoded workflow layer.
 
 For an explicit host contract and capability list, see [`docs/CAPABILITY_MODEL.md`](./CAPABILITY_MODEL.md).
 
@@ -67,7 +67,7 @@ When implementing package/extension-specific desktop affordances, follow [`docs/
 
 ## Runtime/session design
 
-Pi Desktop supports multiple sessions with one isolated Pi RPC runtime per opened session.
+Pi GUI supports multiple sessions with one isolated Pi RPC runtime per opened session.
 
 Key goals:
 - avoid cross-session state bleed

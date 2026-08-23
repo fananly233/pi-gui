@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.pi.gui</id>
+  <name>Pi GUI</name>
+  <summary>Tauri desktop client for the Pi coding agent</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+  <developer_name>Pi GUI Contributors</developer_name>
+  <launchable type="desktop-id">com.pi.gui.desktop</launchable>
+  <description>
+    <p>
+      Pi GUI is a derivative desktop client for the Pi coding agent with native workspace,
+      session, terminal, Git, package, and managed-runtime workflows.
+    </p>
+  </description>
+  <releases>
+    <release version="0.1.0" />
+  </releases>
+</component>

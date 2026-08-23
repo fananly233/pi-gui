@@ -637,7 +637,10 @@ fn release_asset_name(os: &str, arch: &str) -> Result<String, String> {
 fn http_client() -> Result<Client, String> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     Client::builder()
-        .user_agent("Pi-Desktop/1.0 (managed-runtime)")
+        .user_agent(format!(
+            "Pi-GUI/{} (managed-runtime)",
+            env!("CARGO_PKG_VERSION")
+        ))
         .connect_timeout(Duration::from_secs(20))
         .timeout(Duration::from_secs(300))
         .redirect(reqwest::redirect::Policy::limited(5))

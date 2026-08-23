@@ -1,10 +1,10 @@
-# Pi Desktop Themes: Mapping and Behavior
+# Pi GUI Themes: Mapping and Behavior
 
-This document explains how Pi Desktop maps Pi theme files (`~/.pi/agent/themes/*.json`) to desktop UI tokens.
+This document explains how Pi GUI maps Pi theme files (`~/.pi/agent/themes/*.json`) to desktop UI tokens.
 
 ## Default bundled themes
 
-Pi Desktop includes a default first-party theme set (installed on first desktop startup):
+Pi GUI includes a default first-party theme set (installed on first desktop startup):
 
 - `pi-desktop-notion-dark.json`
 - `pi-desktop-catppuccin-dark.json`
@@ -23,7 +23,7 @@ All bundled files are written in full Pi CLI theme schema format (all required `
 
 ## Theme package behavior
 
-In the Packages pane, **Pi Desktop Themes** behaves like a package:
+In the Packages pane, **Pi GUI Themes** behaves like a package:
 
 - **Install**: restores bundled default theme files.
 - **Uninstall**: removes bundled default theme files.
@@ -46,7 +46,7 @@ Variant detection order:
 
 ## Desktop token mapping
 
-Pi Desktop projects Pi theme tokens into desktop semantic tokens, focused on:
+Pi GUI projects Pi theme tokens into desktop semantic tokens, focused on:
 
 - Accent
 - Background/surfaces

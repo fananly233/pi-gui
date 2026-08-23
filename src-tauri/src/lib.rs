@@ -239,7 +239,7 @@ struct RpcStartOptions {
 /// How the pi process was resolved
 #[derive(Debug, Clone)]
 enum PiProcess {
-    /// Versioned standalone binary owned by Pi Desktop.
+    /// Versioned standalone binary owned by Pi GUI.
     ManagedBinary { path: PathBuf, version: String },
     /// Packaged sidecar binary bundled with the desktop app
     SidecarBinary { path: PathBuf },
@@ -3729,7 +3729,7 @@ async fn get_pi_runtime_status(
                 false,
                 Some(path),
                 None,
-                Some("The bundled Pi runtime is updated with Pi Desktop.".to_string()),
+                Some("The bundled Pi runtime is updated with Pi GUI.".to_string()),
             ),
             Ok(PiProcess::PathBinary { path }) => {
                 let fallback = settings.mode == desktop_runtime::RuntimeMode::Managed;
@@ -4154,7 +4154,7 @@ mod tests {
             .expect("system clock before unix epoch")
             .as_nanos();
         std::env::temp_dir().join(format!(
-            "pi-desktop-session-delete-{}-{}",
+            "pi-gui-session-delete-{}-{}",
             std::process::id(),
             nonce
         ))
@@ -4412,10 +4412,10 @@ mod tests {
         let repository = root.join("repo");
         fs::create_dir_all(&repository).expect("create test repository");
         run_test_git(&repository, &["init", "-b", "main"]);
-        run_test_git(&repository, &["config", "user.name", "Pi Desktop Test"]);
+        run_test_git(&repository, &["config", "user.name", "Pi GUI Test"]);
         run_test_git(
             &repository,
-            &["config", "user.email", "pi-desktop@example.invalid"],
+            &["config", "user.email", "pi-gui@example.invalid"],
         );
         fs::write(repository.join("tracked.txt"), "first\n").expect("write tracked file");
         run_test_git(&repository, &["add", "tracked.txt"]);

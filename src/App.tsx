@@ -4,7 +4,7 @@ import { desktopApi, type DesktopRuntimeInfo } from "./api/desktop-api";
 import { AppShell, type RuntimeState } from "./components/AppShell";
 import { usePiChat } from "./hooks/usePiChat";
 
-const WORKSPACE_STORAGE_KEY = "pi-desktop.phase2.workspace";
+const WORKSPACE_STORAGE_KEY = "pi-gui.workspace";
 
 function describeError(error: unknown): string {
 	if (error instanceof Error) return error.message;

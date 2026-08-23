@@ -1,7 +1,7 @@
 {
 	"$schema": "../gen/schemas/desktop-schema.json",
 	"identifier": "default",
-	"description": "Default capability for the Pi Desktop app",
+	"description": "Default capability for the Pi GUI app",
 	"windows": [
 		"main"
 	],

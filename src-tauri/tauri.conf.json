@@ -1,8 +1,8 @@
 {
-	"$schema": "https://raw.githubusercontent.com/nicegui/nicegui/refs/heads/main/nicegui/static/tauri_v2_schema.json",
-	"productName": "Pi Desktop",
-	"identifier": "com.pi.desktop",
-	"version": "1.0.0",
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "Pi GUI",
+	"identifier": "com.pi.gui",
+	"version": "0.1.0",
 	"build": {
 		"beforeDevCommand": "npx vite --port 1420",
 		"devUrl": "http://localhost:1420",
@@ -14,7 +14,7 @@
 		"macOSPrivateApi": true,
 		"windows": [
 			{
-				"title": "Pi Desktop",
+				"title": "Pi GUI",
 				"width": 1100,
 				"height": 750,
 				"minWidth": 600,
@@ -32,6 +32,7 @@
 	},
 	"bundle": {
 		"active": true,
+		"publisher": "Pi GUI contributors",
 		"icon": [
 			"icons/32x32.png",
 			"icons/128x128.png",
@@ -39,20 +40,33 @@
 			"icons/icon.icns",
 			"icons/icon.ico"
 		],
+		"windows": {
+			"allowDowngrades": false,
+			"webviewInstallMode": {
+				"type": "downloadBootstrapper",
+				"silent": true
+			},
+			"nsis": {
+				"installMode": "currentUser"
+			},
+			"wix": {
+				"upgradeCode": "bc684a49-735f-5100-8ea3-5bb516c8f702"
+			}
+		},
 		"linux": {
 			"appimage": {
 				"files": {
-					"usr/share/metainfo/com.pi.desktop.metainfo.xml": "linux/com.pi.desktop.metainfo.xml"
+					"usr/share/metainfo/com.pi.gui.metainfo.xml": "linux/com.pi.gui.metainfo.xml"
 				}
 			},
 			"deb": {
 				"files": {
-					"usr/share/metainfo/com.pi.desktop.metainfo.xml": "linux/com.pi.desktop.metainfo.xml"
+					"usr/share/metainfo/com.pi.gui.metainfo.xml": "linux/com.pi.gui.metainfo.xml"
 				}
 			},
 			"rpm": {
 				"files": {
-					"usr/share/metainfo/com.pi.desktop.metainfo.xml": "linux/com.pi.desktop.metainfo.xml"
+					"usr/share/metainfo/com.pi.gui.metainfo.xml": "linux/com.pi.gui.metainfo.xml"
 				}
 			}
 		}

@@ -2926,8 +2926,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "pi-desktop"
-version = "1.0.0"
+name = "pi-gui"
+version = "0.1.0"
 dependencies = [
  "flate2",
  "fs2",

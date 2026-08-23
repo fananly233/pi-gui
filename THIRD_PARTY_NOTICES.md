@@ -1,6 +1,6 @@
 # Third-Party Notices
 
-This repository is a derivative work. The repository-level license remains MIT as described in `LICENSE`; incorporated third-party material remains subject to its original license and attribution below.
+Pi GUI is an independently modified derivative work and is not an official release of either donor project. The repository-level license remains MIT as described in `LICENSE`; incorporated third-party material remains subject to its original license and attribution below.
 
 ## Gustav Pi Desktop
 
@@ -8,7 +8,7 @@ This repository is a derivative work. The repository-level license remains MIT a
 - Base revision: `5d698433864fbebafa24e141da0ea56297766cfe`
 - License: MIT (`LICENSE`)
 - Use in this repository: Tauri 2 application structure, Rust commands, Pi RPC lifecycle, native capabilities, terminal/Git foundations, assets, and the initial frontend baseline.
-- Modifications: the renderer was migrated from Lit to React while preserving the Rust/Tauri runtime boundary. Later phases add typed chat/session/model/file/ecosystem bridges, replace broad renderer shell/Git entry points with a managed native PTY and typed Git/worktree commands, and add a versioned Desktop-owned Pi runtime manager.
+- Modifications: the product identity is now Pi GUI (`com.pi.gui`), and the renderer was migrated from Lit to React while preserving the Rust/Tauri runtime boundary. Later phases add typed chat/session/model/file/ecosystem bridges, replace broad renderer shell/Git entry points with a managed native PTY and typed Git/worktree commands, and add a versioned app-owned Pi runtime manager.
 
 ## DLYZZT Pi Desktop
 
@@ -31,10 +31,10 @@ This repository is a derivative work. The repository-level license remains MIT a
 
 - xterm.js: <https://github.com/xtermjs/xterm.js>, packages `@xterm/xterm` 6.0.0 and `@xterm/addon-fit` 0.11.0, MIT.
 - portable-pty: <https://github.com/wezterm/wezterm>, crate `portable-pty` 0.9.0, MIT.
-- Use in this repository: terminal emulation, fit-to-panel behavior, and native cross-platform PTY ownership. Pi Desktop's React/Rust lifecycle and security boundary are project modifications, not upstream xterm.js or portable-pty features.
+- Use in this repository: terminal emulation, fit-to-panel behavior, and native cross-platform PTY ownership. Pi GUI’s React/Rust lifecycle and security boundary are project modifications, not upstream xterm.js or portable-pty features.
 
 ## Pi standalone runtime
 
 - Source and release assets: <https://github.com/earendil-works/pi>
 - Use in this repository: Phase 8 can download the exact platform/architecture standalone release on explicit user request, verify the accompanying published SHA-256 checksum, and store versioned binaries under the application's data directory.
-- Distribution boundary: no Pi standalone binary is committed to or bundled by this repository. Downloaded runtime artifacts remain separate upstream software; Pi Desktop's downloader, extraction guards, activation pointers, rollback, diagnostics, and lifecycle integration are project modifications.
+- Distribution boundary: no Pi standalone binary is committed to or bundled by this repository. Downloaded runtime artifacts remain separate upstream software; Pi GUI’s downloader, extraction guards, activation pointers, rollback, diagnostics, and lifecycle integration are project modifications.

@@ -9,7 +9,7 @@ type TitleBarProps = {
 
 function runWindowAction(action: () => Promise<void>): void {
 	void action().catch((error: unknown) => {
-		console.error("[pi-desktop] window action failed", error);
+		console.error("[pi-gui] window action failed", error);
 	});
 }
 
@@ -27,7 +27,7 @@ export function TitleBar({ theme, onToggleTheme }: TitleBarProps) {
 		<header className="titlebar">
 			<div className="titlebar__brand" onMouseDown={startDragging} onDoubleClick={toggleMaximize}>
 				<span className="brand-mark" aria-hidden="true">π</span>
-				<span className="brand-name">Pi Desktop</span>
+				<span className="brand-name">Pi GUI</span>
 				<span className="brand-badge">React shell</span>
 			</div>
 

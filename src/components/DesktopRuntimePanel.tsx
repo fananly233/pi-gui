@@ -25,8 +25,8 @@ function describeError(error: unknown): string {
 }
 
 function runtimeHeading(status: PiRuntimeStatus): string {
-	if (status.effectiveSource === "managed") return "Managed by Pi Desktop";
-	if (status.effectiveSource === "bundled") return "Bundled with Pi Desktop";
+	if (status.effectiveSource === "managed") return "Managed by Pi GUI";
+	if (status.effectiveSource === "bundled") return "Bundled with Pi GUI";
 	if (status.effectiveSource === "system" && status.fallback) return "System Pi fallback";
 	if (status.effectiveSource === "system") return "Using system Pi";
 	return "Pi is not installed";
@@ -156,13 +156,13 @@ export function DesktopRuntimePanel({ onClose }: DesktopRuntimePanelProps) {
 	const confirmationCopy = confirmation?.kind === "install"
 		? {
 			title: "Install managed Pi?",
-			body: "Pi Desktop will download the matching earendil-works/pi release, verify its published SHA-256 checksum, and keep the previous managed version for rollback. No global npm package or PATH entry will be changed.",
+			body: "Pi GUI will download the matching earendil-works/pi release, verify its published SHA-256 checksum, and keep the previous managed version for rollback. No global npm package or PATH entry will be changed.",
 			confirm: "Download and install",
 		}
 		: confirmation?.kind === "system-settings"
 			? {
 				title: "Use system Pi?",
-				body: "Pi Desktop will execute this binary for future sessions but will never update or remove it. Leave the path blank to use Pi from PATH.",
+				body: "Pi GUI will execute this binary for future sessions but will never update or remove it. Leave the path blank to use Pi from PATH.",
 				confirm: "Use system Pi",
 			}
 			: confirmation?.kind === "activate"
@@ -244,7 +244,7 @@ export function DesktopRuntimePanel({ onClose }: DesktopRuntimePanelProps) {
 						<label>
 							<span>Runtime source</span>
 							<select value={mode} onChange={(event) => setMode(event.target.value as PiRuntimeMode)} disabled={busy}>
-								<option value="managed">Managed by Pi Desktop</option>
+								<option value="managed">Managed by Pi GUI</option>
 								<option value="system">Use system Pi</option>
 							</select>
 						</label>
@@ -254,7 +254,7 @@ export function DesktopRuntimePanel({ onClose }: DesktopRuntimePanelProps) {
 								<input value={systemPath} onChange={(event) => setSystemPath(event.target.value)} placeholder="Leave blank to use Pi from PATH" spellCheck={false} disabled={busy} />
 							</label>
 						) : null}
-						<p>Managed mode falls back to an existing system Pi until a verified standalone release is installed. Pi Desktop never changes global npm packages or PATH.</p>
+						<p>Managed mode falls back to an existing system Pi until a verified standalone release is installed. Pi GUI never changes global npm packages or PATH.</p>
 						<button type="button" onClick={requestRuntimeSettingsSave} disabled={busy || !settingsChanged || status.activeRpcCount > 0}>Save runtime source</button>
 					</section>
 

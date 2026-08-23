@@ -1,23 +1,16 @@
 {
-	"name": "pi-desktop",
-	"version": "1.0.0",
+	"name": "pi-gui",
+	"version": "0.1.0",
 	"private": true,
 	"type": "module",
-	"description": "Pi Desktop - A minimalist coding agent desktop app",
+	"description": "Pi GUI - A Tauri desktop client for the Pi coding agent",
 	"license": "MIT",
-	"homepage": "https://github.com/gustavonline/pi-desktop",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/gustavonline/pi-desktop.git"
-	},
-	"bugs": {
-		"url": "https://github.com/gustavonline/pi-desktop/issues"
-	},
 	"scripts": {
 		"dev": "vite --port 1420",
 		"tauri": "tauri",
 		"build:frontend": "npx vite build",
 		"build": "tauri build",
+		"check:release": "node scripts/verify-release-metadata.mjs",
 		"preview": "vite preview",
 		"check": "tsc --noEmit",
 		"test": "node --experimental-strip-types --test tests/*.test.mjs",

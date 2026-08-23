@@ -1,6 +1,6 @@
 # Capability Model
 
-Pi Desktop is a **capability host** for the Pi ecosystem.
+Pi GUI is a **capability host** for the Pi ecosystem.
 
 ## Mental model
 
@@ -96,7 +96,7 @@ When supporting mixed runtime versions, use a compatibility helper that tries `g
 
 ## Unsupported capability behavior
 
-If an extension emits an unsupported `extension_ui_request` method, Pi Desktop:
+If an extension emits an unsupported `extension_ui_request` method, Pi GUI:
 
 1. logs a trace/debug entry,
 2. sends an explicit error response (`extension_ui_response`) instead of failing silently.

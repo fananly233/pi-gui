@@ -21,7 +21,7 @@ labels: ["type:bug"]
 ## Environment
 
 - OS: 
-- Pi Desktop version: 
+- Pi GUI version:
 - Pi CLI version (`pi --version`): 
 
 ## Logs / screenshots
