@@ -1,29 +1,24 @@
 # Pi GUI Releases
 
+Last updated: 2026-08-23.
+
 ## Current state
 
-`0.1.0` is an unpublished Windows-only binary release candidate. The independent repository is [fananly233/pi-gui](https://github.com/fananly233/pi-gui), and the locally generated Windows installers are not signed. macOS and Linux remain source-build targets without supported `0.1.0` release assets. No release tag or Pi GUI draft exists. The Gustav project’s releases are upstream history, not Pi GUI releases.
+Pi GUI `0.1.0` is an unpublished **source-only** release candidate. The independent repository is [fananly233/pi-gui](https://github.com/fananly233/pi-gui). No Pi GUI tag, draft, or Release currently exists, and Gustav's historical releases are upstream history rather than Pi GUI releases.
 
-## Repository publication and privacy status
+The maintainer decided that Pi GUI will publish source code only. There will be no official Windows, macOS, or Linux executable, installer, application bundle, package-manager binary, or updater payload. A future `0.1.0` GitHub Release may expose only GitHub-generated source ZIP and tarball downloads for the exact tag, with zero attached assets.
 
-Recorded on Windows on 2026-08-23:
+## Distribution contract
 
-- current tracked/non-ignored candidate files contain no detected common private-key, provider-token, credential-bearing URL, private-config filename, or current-machine home-path value;
-- the current Pi GUI `HEAD` history has no detected secret-pattern hits;
-- the local migration control prompt is ignored and has never appeared in Git history;
-- remote URLs contain no embedded credentials;
-- historical test-key and credential-URL fixtures exist only on the local `archive/electron-mvp` donor branch, not in `HEAD`; that branch must not be pushed to the independent repository;
-- all derivative commits through the current `HEAD` use the connected public GitHub identity and GitHub noreply author/committer email. The explicitly approved rewrite preserved commit count, topology, subjects, dates, and the final source tree while changing the rewritten commit SHAs;
-- PR #1 is merged and the active `main` merge commit preserves the exact reviewed parents and source tree with noreply metadata. GitHub's immutable PR record still identifies its first generated merge object with obsolete non-noreply author metadata. The maintainer explicitly accepts this metadata-only platform residual; no GitHub Support cleanup request is being pursued for `0.1.0`;
-- the public GitHub profile currently exposes no public email address;
-- with explicit maintainer approval, the entire known Phase 9 native-UI fixture `%TEMP%\pi-gui-phase9-ui-e97f42c987594cce899a018465edcc3f` was moved to the Recycle Bin on 2026-08-23. Its original path and copied `auth.json`, `settings.json`, and `models-store.json` paths were verified absent; the app-data quarantine and unrelated Phase 10A native-test directories remained present and untouched;
-- six donor-only issue/development logs remain local but are removed from the Git index and covered by exact ignore rules;
-- only the reviewed Pi GUI history was pushed to `origin/main`; the generated one-file remote root was replaced with an exact lease after its `fananly` MIT copyright line was retained in `LICENSE`, and its original commit remains recoverable from a local bundle;
-- GitHub private vulnerability reporting is enabled and was verified through the dedicated repository API.
+- The public repository and version tags are the source of truth.
+- Release notes retain the Gustav and DLYZZT derivative-work attribution.
+- `.github/workflows/release.yml` validates an existing exact tag and creates a source-only draft.
+- The workflow never builds, downloads, uploads, signs, or attaches application binaries.
+- `.github/workflows/windows-clean-machine.yml` may build installers ephemerally for engineering QA but uploads no artifacts.
+- Local packages are unofficial developer builds and must not be represented as Pi GUI release assets.
+- No code-signing identity or signing credential is needed under this policy.
 
-`npm run check:publish` now passes across 150 tracked/non-ignored candidate files. It automates the content/history/metadata/remote/attribution checks and redacts suspected values from its output.
-
-The 2026-08-23 GitHub configuration audit found zero repository Actions secrets, zero repository Actions variables, zero Dependabot secrets, and zero Codespaces secrets. Copilot review created one empty `copilot` environment with no protection rules, secrets, or variables; it contains no signing or private configuration. A real Windows signing identity still has to be configured outside Git. Certificate files and the runner-only Windows signing config are ignored by exact release-safety rules. Phase 10B-A did not access or configure signing credential values.
+The enforceable details are recorded in [SIGNING.md](./SIGNING.md), whose filename is retained to keep existing documentation links stable.
 
 ## Release identity
 
@@ -33,107 +28,42 @@ The 2026-08-23 GitHub configuration audit found zero repository Actions secrets,
 | Package/binary name | `pi-gui` |
 | Application identifier | `com.pi.gui` |
 | First derivative version | `0.1.0` |
-| Windows publisher metadata | `Pi GUI contributors` |
-| WiX upgrade code | `bc684a49-735f-5100-8ea3-5bb516c8f702` |
+| Repository | `https://github.com/fananly233/pi-gui` |
+| Distribution | Source only; zero attached release assets |
 
-The npm, Cargo, Linux metainfo, contribution, issue, and security metadata point to `https://github.com/fananly233/pi-gui`. Lineage links remain in the README and third-party notices.
-
-## Windows installer policy
-
-| Bundle | Policy |
-| --- | --- |
-| NSIS `setup.exe` | Primary installer; current-user scope; no elevation expected for the normal path. |
-| MSI | Administrator-oriented bundle; Tauri/WiX uses machine scope. |
-| Downgrade | Disabled. |
-| Upgrade identity | Stable application identifier and explicit WiX upgrade code. |
-| App data | Default uninstall must preserve `%APPDATA%\com.pi.gui`. |
-| WebView2 | `downloadBootstrapper`; installation may need network access when WebView2 is absent. |
-| Signing | A public Windows release must have valid Authenticode signatures on both NSIS and MSI assets. |
-
-## Signed-release workflow
-
-`.github/workflows/release.yml` no longer lets `tauri-action` create a draft while artifacts are still unverified. For the Windows-only `0.1.0` scope, it checks out an existing exact tag, builds into runner-local staging, and creates or updates a draft only after the signed Windows application, NSIS installer, and MSI pass verification.
-
-- Windows supports an eligible exportable PFX path and verifies the app executable, NSIS installer, and MSI against an exact signer subject and trusted timestamp.
-- The final job requires exactly one NSIS installer and one MSI before uploading anything to a draft.
-- macOS and Linux artifacts are not built or accepted by the `0.1.0` release workflow.
-
-Current Windows signing secrets and variables are absent, so the workflow stops before building signed artifacts and the draft job cannot run. Provider selection and setup are documented in [SIGNING.md](./SIGNING.md).
-
-Phase 10B-A records the signing route as `UNDECIDED`. The checked-in workflow implements only an eligible exportable-PFX route. Modern cloud/HSM/EV, issuer-managed, and post-2023 OV certificates require a separately reviewed provider-specific `signCommand`; updater keys are not Authenticode. `npm run check:release` is the credential-free structural preflight and does not claim that signing is configured.
+The npm, Cargo, Tauri, Linux metainfo, contribution, issue, and security metadata use this independent identity. Lineage links remain in the README and third-party notices.
 
 ## Verification levels
 
-These are separate claims and must not be collapsed into “release verified.”
+These remain separate claims:
 
-1. Local build verification checks source, tests, metadata, bundle contents, and signatures. It is not clean-machine evidence.
-2. `.github/workflows/windows-clean-machine.yml` starts on a fresh GitHub-hosted Windows runner, builds the unsigned candidate there, and performs install, launch, update/reinstall, uninstall, registry cleanup, and app-data preservation checks.
-3. `.github/workflows/release-smoke.yml` downloads the two Windows release assets on a fresh hosted runner. Both must match the configured signer and include trusted timestamps before the NSIS lifecycle test runs.
+1. Deterministic checks validate repository metadata, TypeScript, renderer tests, frontend output, Rust, and dependencies.
+2. Real Pi/runtime gates exercise the configured Pi integration in disposable state.
+3. Native Tauri acceptance checks application behavior on the development machine.
+4. The optional Windows clean-machine workflow tests ephemeral packages on a fresh hosted runner without retaining them.
+5. Source release verification checks the exact tag, repository privacy, attribution, and zero-asset release policy.
 
-For a later version, provide `previous_tag` to either Windows workflow to exercise a true cross-version NSIS upgrade. For the first `0.1.0` release, the lifecycle gate can only verify the installer’s update/reinstall path because no earlier Pi GUI identity exists.
-
-The PowerShell lifecycle script refuses to install outside the authorized GitHub-hosted Windows workflows unless `-AllowCurrentMachine` is supplied explicitly. Do not use that override as clean-machine evidence.
+Passing a local bundle or clean-machine test does not turn that bundle into a supported download.
 
 ## Current `0.1.0` evidence
 
-Recorded on Windows on 2026-08-23:
+Recorded on 2026-08-23:
 
-Phase 10A integrated [PR #1](https://github.com/fananly233/pi-gui/pull/1) into `main` as a two-parent merge commit. The active merge commit is `3bb7cc411467fece7d5dbe5edf083d78a836a456`; its parents are the reviewed base `4147e6a48142a63ad701dec0d13b7a659ca3b2b9` and PR head `ef758c0ab7e24724de50db71cba8655918770577`, and its tree is identical to that PR head.
+- Phase 9 passed deterministic checks, all five real Pi/runtime gates, isolated native acceptance, and a GitHub-hosted Windows lifecycle run for `867ac378a0eaab9c55c38daecea81b1491b357d2`.
+- Phase 10A merged [PR #1](https://github.com/fananly233/pi-gui/pull/1) as `3bb7cc411467fece7d5dbe5edf083d78a836a456`; its tree matches the reviewed PR head. [Mainline CI](https://github.com/fananly233/pi-gui/actions/runs/32664955474) and the [Windows lifecycle run](https://github.com/fananly233/pi-gui/actions/runs/32665181610) passed.
+- `npm run check:publish` found no common credential/private-key pattern, tracked private-config filename, current-machine home path, credential-bearing remote, or missing derivative-work attribution in the reviewed branch.
+- The maintainer accepts the immutable metadata-only residual in GitHub's PR #1 record. Active mainline commits use the approved public GitHub identity and noreply email metadata.
+- The earlier signing-route audit found no configured repository signing secrets or variables and did not create or access signing credentials.
+- Earlier clean-machine runs temporarily uploaded unsigned Actions artifacts as historical QA evidence. The source-only workflow revision stops all future installer artifact uploads; those historical files were never Pi GUI Release assets.
 
-| Phase 10A check | Result | Evidence |
-| --- | --- | --- |
-| Mainline CI | PASS | [Run 32664955474](https://github.com/fananly233/pi-gui/actions/runs/32664955474) passed for `3bb7cc4`. |
-| Windows clean-machine lifecycle | PASS | [Run 32665181610](https://github.com/fananly233/pi-gui/actions/runs/32665181610) passed validation, NSIS/MSI build, MSI extraction, install, launch, same-version update/reinstall, uninstall, cleanup, and app-data preservation for `3bb7cc4`. |
-| Native Windows smoke | PASS | The isolated release EXE showed `windows / x86_64` and Desktop `v0.1.0`; theme switching and restart persistence, maximize/restore, application close, and process exit passed without touching the live Pi agent directory. |
-| Publication safety | PASS WITH ACCEPTED PLATFORM RESIDUAL | The active mainline history passes `npm run check:publish` with noreply metadata. The known local fixture was moved to the Recycle Bin and its original sensitive paths were verified absent. The maintainer explicitly accepts GitHub's immutable PR #1 metadata-only residual. |
-| Release boundary | BLOCKED | The hosted candidate artifact remains unsigned. No tag, draft, Release, or signing credential was created or configured. |
+The detailed Phase 9 evidence remains in [RC_ACCEPTANCE.md](./RC_ACCEPTANCE.md). Historical unsigned hashes and signature observations identify tested local bytes only and do not define supported downloads.
 
-Phase 10B-A added a credential-free release preflight without changing runtime/package inputs. On 2026-08-23, `check:release`, TypeScript, 26 Node tests, frontend build, Cargo check, 25 Rust tests with the managed-runtime download test ignored, full `npm audit`, `check:publish`, and `git diff --check` passed. The maintainer then closed the two operator privacy decisions by moving the known Phase 9 fixture to the Recycle Bin, verifying its original sensitive paths absent, and explicitly accepting the immutable PR #1 metadata-only residual. No real-Pi or clean-machine gate was repeated because this phase changes only release validation and documentation.
-
-The resulting local Windows candidates remain intentionally unsigned:
-
-- `pi-gui.exe` (17,401,856 bytes): `B09863230F553711334C17372B94B74A744D76E66612DA82EF03F3BC8C077299`, `NotSigned`;
-- `Pi GUI_0.1.0_x64-setup.exe` (4,189,230 bytes): `20DBFBC4C5BF565210A4DC25E737F90F947B45C4CCCC6920F03DCF042DE4B07B`, `NotSigned`;
-- `Pi GUI_0.1.0_x64_en-US.msi` (6,017,024 bytes): `CF873E62A84EC5B5CD0522E7EF1ED375619F394225798C1FD8E91D6880601620`, `NotSigned`.
-
-These hashes identify this local build only. They are not release assets, and `NotSigned` remains a hard publication blocker.
-
-Phase 9 source stabilization passed the local deterministic, five real-Pi/runtime, native Tauri, and hosted Windows lifecycle matrix recorded in [RC_ACCEPTANCE.md](./RC_ACCEPTANCE.md). The tested runtime/source commit is `867ac378a0eaab9c55c38daecea81b1491b357d2`; the evidence-only documentation update after that commit does not alter bundled application inputs. No release tag exists.
-
-| Check | Result | Evidence |
-| --- | --- | --- |
-| Release identity and tag | PASS | `check:release` accepted `v0.1.0` and matched npm, lockfile, Cargo, Tauri, HTML, and Linux metainfo. |
-| Pi GUI icon identity | PASS | The inherited `DESK` wordmark/source filename was replaced with a deterministic `GUI` pixel mark and the complete Tauri icon set was regenerated. |
-| TypeScript and renderer tests | PASS | Strict check plus 26 deterministic tests, including real-gate isolation/startup timing, RPC readiness, exclusive mutation guards, and native-confirmation safety contracts. |
-| Rust check and library tests | PASS | `cargo check --locked` passes. The real PTY test waits until the shell emits DSR before replying with CPR, and a separate Windows test exercises the explicit `cmd.exe` fallback. The current serial library run passed 25 tests with one managed-runtime network gate ignored. |
-| Frontend production build | PASS | 321 modules built. |
-| Full dependency audit | PASS | Zero reported production or development dependency vulnerabilities after updating the locked Vite 7 toolchain within its existing major version. |
-| Windows bundle build | PASS WITH LINKER INFO | Rebuilt the exact Phase 9 candidate as a 17,401,856-byte application, 4,189,296-byte NSIS installer, and 6,017,024-byte MSI. The only Rust warning was the localized MSVC import-library linker message. |
-| Generated installer metadata | PASS | `Pi GUI`, `0.1.0`, `com.pi.gui`, current-user NSIS, per-machine MSI, fixed upgrade code, and downgrade blocking were present. |
-| Windows signatures | BLOCKED | Main EXE, NSIS, and MSI all report `NotSigned`. |
-| Hosted clean-machine lifecycle | PASS | [Run 32658152422](https://github.com/fananly233/pi-gui/actions/runs/32658152422) built `867ac37` on a fresh Windows runner. MSI extraction, NSIS install, first launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation all passed. Cross-version upgrade was skipped because no earlier Pi GUI release exists. |
-
-Phase 9 local bundle SHA-256 values:
-
-- `pi-gui.exe` (17,401,856 bytes): `B47DB7C8156537FA59E8AF731D496191A0CF9E4B84E7EB153899C81491B15CFB`
-- `Pi GUI_0.1.0_x64-setup.exe` (4,189,296 bytes): `5AA66F3777D7E7FF19C2E7DD57198C53F72C734E4215D306E77885748D3E1CCA`
-- `Pi GUI_0.1.0_x64_en-US.msi` (6,017,024 bytes): `94FBE5710381DD35FB759A32EC32B2DBDA32F54D053138E06CEA29DCF2D0F70E`
-
-Phase 9 hosted evidence:
-
-- tested source commit: `867ac378a0eaab9c55c38daecea81b1491b357d2`;
-- [CI run 32658150459](https://github.com/fananly233/pi-gui/actions/runs/32658150459): PASS;
-- [Windows clean-machine run 32658152422](https://github.com/fananly233/pi-gui/actions/runs/32658152422): PASS;
-- [unsigned Windows artifact 9498181296](https://github.com/fananly233/pi-gui/actions/runs/32658152422/artifacts/9498181296): `pi-gui-windows-unsigned-candidate`, 9,954,766-byte ZIP, digest `sha256:74f3c4ca878b6302f74f633c04d25dea4114291ba5a76347b5f25b7fb782104d`, retained until 2026-11-21T18:28:35Z;
-- workflow signature observation: `NotSigned`; this run is lifecycle evidence, not permission to publish the artifact.
-
-The earlier `03d064bf1931b7df003dac4f519a392d0d68a185` lifecycle remains historical baseline evidence only: [CI 32650824513](https://github.com/fananly233/pi-gui/actions/runs/32650824513) and [clean-machine 32650837760](https://github.com/fananly233/pi-gui/actions/runs/32650837760).
-
-## Required local gates
+## Required source gates
 
 ```powershell
 $env:RELEASE_TAG = "v0.1.0"
 npm ci
+npm run check:publish
 npm run check:release
 npm run check
 npm test
@@ -141,58 +71,35 @@ npm run build:frontend
 cargo check --locked --manifest-path src-tauri/Cargo.toml
 cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
 npm audit
-npm run tauri -- build --bundles nsis,msi
+git diff --check
 ```
 
-Also inspect generated WiX/NSIS metadata and run `Get-AuthenticodeSignature` on every Windows artifact. An unsigned result is a release blocker, not a warning to waive.
-
-Before the first public push, also run:
+Real Pi/runtime gates are required when the release-facing change affects those paths:
 
 ```powershell
-npm run check:publish
-git status --short
-git diff --check
-git diff --cached
+npm run gate:pi-real
+npm run gate:sessions-real
+npm run gate:models-real
+npm run gate:ecosystem-real
+npm run gate:runtime-real
 ```
 
-Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive/electron-mvp`, use `git push --all`, or use `git push --mirror`.
+## Source release sequence
 
-## Release sequence
+1. Confirm `package.json`, Cargo, Tauri, Linux metainfo, and the intended tag agree.
+2. Run the source gates and review the final diff and commit metadata.
+3. Confirm README, `THIRD_PARTY_NOTICES.md`, license files, and release notes retain donor attribution.
+4. Push only the reviewed Pi GUI branch. Never push `archive/electron-mvp`, `--all`, or `--mirror`.
+5. With explicit maintainer approval, create the exact version tag.
+6. Let **Source-only Release** validate the tag and create a draft with no attached assets.
+7. Confirm the draft exposes only GitHub-generated source archives, then publish it manually.
 
-1. Confirm `package.json`, Cargo, Tauri, Linux metainfo, and the intended tag all agree.
-2. Run the local gates and record exact results.
-3. Re-run `check:publish` on the final clean commit and review the branch diff against the Gustav base.
-4. Confirm the independent repository URL, derivative-work declaration, and private vulnerability-reporting setting.
-5. Push only the reviewed Pi GUI history without merging or pushing donor-only histories.
-6. Run **Windows Clean-Machine Candidate**. A cross-version upgrade result is required once a prior Pi GUI release exists.
-7. Configure Windows signing according to `docs/SIGNING.md`.
-8. Create the exact version tag. The signed-release workflow creates a draft only after Windows Authenticode verification succeeds.
-9. Run **Signed Windows Release Smoke** against the exact draft assets.
-10. Publish only after all required jobs pass and the release notes include attribution.
+No tag or Release is created by the policy migration itself.
 
-## Expected `0.1.0` artifacts
+## Expected `0.1.0` downloads
 
-- Windows: NSIS `setup.exe` and `.msi`
+- GitHub-generated `Source code (zip)`;
+- GitHub-generated `Source code (tar.gz)`;
+- no attached files.
 
-No macOS or Linux binary is part of the supported `0.1.0` release. Their source-build metadata remains in the repository for future work.
-
-## Evidence checklist
-
-- Phase 10A active mainline merge commit: `3bb7cc411467fece7d5dbe5edf083d78a836a456`; reviewed source tree matches PR head `ef758c0ab7e24724de50db71cba8655918770577`.
-- Phase 10A mainline CI and Windows clean-machine runs: [32664955474](https://github.com/fananly233/pi-gui/actions/runs/32664955474) and [32665181610](https://github.com/fananly233/pi-gui/actions/runs/32665181610), both PASS.
-- Phase 10A unsigned Windows artifact: [9499997749](https://github.com/fananly233/pi-gui/actions/runs/32665181610/artifacts/9499997749), `pi-gui-windows-unsigned-candidate`, 9,956,736-byte ZIP, digest `sha256:3fa655fa6f51ae00b24f23c2b46648f64c337e46415eabef8babd64bfda29d31`, retained until 2026-11-21T20:41:23Z.
-- Phase 9 tested runtime/source commit: `867ac378a0eaab9c55c38daecea81b1491b357d2`; no release tag exists.
-- Phase 9 CI and Windows clean-machine runs: [32658150459](https://github.com/fananly233/pi-gui/actions/runs/32658150459) and [32658152422](https://github.com/fananly233/pi-gui/actions/runs/32658152422), both PASS.
-- Previous hosted baseline commit: `03d064bf1931b7df003dac4f519a392d0d68a185`.
-- Previous CI run URL: [32650824513](https://github.com/fananly233/pi-gui/actions/runs/32650824513), PASS.
-- Previous Windows clean-machine run URL: [32650837760](https://github.com/fananly233/pi-gui/actions/runs/32650837760), PASS.
-- Signed release-smoke run URL: NOT RUN; no signed draft assets exist.
-- Windows NSIS/MSI signer and signature status: no signer; `NotSigned`.
-- macOS and Linux release assets: NOT APPLICABLE to the Windows-only `0.1.0` scope.
-- Install result: PASS on a fresh GitHub-hosted Windows runner.
-- Launch result: PASS before and after update/reinstall.
-- Same-version update/reinstall result: PASS for `0.1.0`.
-- Cross-version upgrade result or first-release N/A justification: N/A because there is no earlier Pi GUI release with the same upgrade identity.
-- Uninstall result: PASS; executable, install directory, shortcuts, and uninstall registry key were removed.
-- App-data preservation result: PASS across update/reinstall and default uninstall.
-- Known issues: GitHub's immutable PR #1 record retains the explicitly accepted metadata-only residual. The repository has no selected signing route, Windows signing secrets, or variables, so tag creation, draft creation, public installer distribution, and signed release smoke remain blocked.
+In particular, `.exe`, `.msi`, `.msix`, `.dmg`, `.app`, `.deb`, `.rpm`, AppImage, updater payloads, and package-manager binaries are out of scope.

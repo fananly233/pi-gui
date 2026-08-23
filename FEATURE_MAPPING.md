@@ -103,10 +103,11 @@ Package operations are serialized, capped at 512 KiB of captured output, limited
 | Release packaging | ✅ Windows x64 release build produces both MSI and NSIS bundles from the locked Rust graph. |
 | Silent/background update | ❌ Deliberately absent. Download/install and version switches require an explicit in-app confirmation and apply only to new sessions. |
 
-## Remaining release work
+## Remaining source release work
 
-The first GitHub-hosted Windows lifecycle passed for `03d064b`, including install, launch, same-version update/reinstall, uninstall cleanup, and app-data preservation. Phase 9 changes have local deterministic, real-Pi, and native acceptance evidence; the hosted lifecycle must be rerun for the stabilized candidate before release. Cross-version upgrade remains not applicable until an earlier Pi GUI release exists.
+GitHub-hosted Windows lifecycle runs passed for the stabilized Phase 9 and merged Phase 10A source, including install, launch, same-version update/reinstall, uninstall cleanup, and app-data preservation. These runs are engineering evidence only: temporary installers are no longer uploaded and Pi GUI publishes source code only.
 
 - Re-run `npm run check:publish` on every release-facing commit before pushing it to the independent repository.
-- Configure Windows signing and macOS signing/notarization, then pass the signed cross-platform release-smoke workflow.
-- Run a true cross-version upgrade gate once an earlier Pi GUI release exists; `0.1.0` can only prove the update/reinstall path.
+- Validate the exact source tag with `npm run check:release` and the deterministic source gates.
+- Create a zero-asset draft and publish only GitHub-generated source archives after explicit maintainer approval.
+- Keep local bundle and clean-machine lifecycle checks separate from supported distribution claims.

@@ -51,7 +51,7 @@ jobs:
       - name: Renderer tests
         run: npm test
 
-      - name: Release metadata check
+      - name: Source-release policy check
         run: npm run check:release
 
       - name: Frontend build

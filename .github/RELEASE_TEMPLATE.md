@@ -1,4 +1,4 @@
-# Pi GUI release
+# Pi GUI source release
 
 Pi GUI is a derivative of [Gustav Pi Desktop](https://github.com/gustavonline/pi-desktop), with selected React UI concepts and visual tokens adapted from [DLYZZT Pi Desktop](https://github.com/DLYZZT/pi-desktop). This is not an official release of either upstream project.
 
@@ -10,35 +10,31 @@ Pi GUI is a derivative of [Gustav Pi Desktop](https://github.com/gustavonline/pi
 
 -
 
-## Artifacts
+## Source-only distribution
 
-- Windows: signed NSIS `setup.exe`, signed `.msi`
+This release contains source code only. Pi GUI does not provide or endorse downloadable executables, installers, application bundles, or package-manager binaries. The only downloads are the source archives generated automatically by GitHub from the tagged commit.
 
-Pi GUI `0.1.0` is a Windows-only binary release. macOS and Linux remain source-build targets without supported `0.1.0` release assets.
+To run or build Pi GUI, follow the prerequisites and source-build instructions in `README.md`. Any locally built bundle is an unsupported developer build and is not an official Pi GUI release artifact.
 
 ## Release gates
 
-- [ ] `npm run check:publish` passes and the reviewed branch alone was pushed.
+- [ ] `npm run check:publish` passes and only the reviewed Pi GUI branch was pushed.
 - [ ] Commit author/committer metadata uses approved public identities and noreply email addresses.
 - [ ] README, notices, and this release retain Gustav/DLYZZT derivative-work attribution.
 - [ ] Tag matches the package, Cargo, Tauri, and Linux metainfo versions.
-- [ ] CI and production dependency audit pass.
-- [ ] Windows clean-machine install, launch, update/reinstall, uninstall, and app-data preservation pass.
-- [ ] Cross-version Windows upgrade passes, or this is the first Pi GUI release and is marked N/A.
-- [ ] Windows NSIS and MSI signatures are `Valid`.
-- [ ] Windows signer subject and trusted timestamp match the reviewed release configuration.
-- [ ] Signed release smoke passes on Windows.
-- [ ] Known issues and installation network requirements are documented.
+- [ ] CI, deterministic tests, and dependency audit pass.
+- [ ] The GitHub Release has zero attached assets.
+- [ ] The release page offers only GitHub-generated source archives.
+- [ ] Known source-build requirements and limitations are documented.
 - [ ] Private vulnerability reporting is enabled for the independent repository.
 
 ## Verification evidence
 
+- Tag:
 - Commit:
-- Clean-machine run:
-- Signed release-smoke run:
-- Signing identities:
-- Windows timestamp authority:
+- CI run:
+- Source-policy check:
 
 ## Known limitations
 
--
+- No official binaries or installers are distributed.

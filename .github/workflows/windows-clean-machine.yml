@@ -1,19 +1,14 @@
-name: Windows Clean-Machine Candidate
+name: Windows Clean-Machine Engineering Check
 
 on:
   workflow_dispatch:
-    inputs:
-      previous_tag:
-        description: "Optional previous Pi GUI tag for a cross-version upgrade test"
-        required: false
-        type: string
 
 permissions:
   contents: read
 
 jobs:
   install-lifecycle:
-    name: Build, install, launch, update, uninstall
+    name: Ephemeral build, install, launch, update, uninstall
     runs-on: windows-latest
     timeout-minutes: 45
     env:
@@ -62,18 +57,6 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "MSI administrative extraction failed with $($process.ExitCode)" }
           if (-not (Get-ChildItem $target -Recurse -Filter "pi-gui.exe")) { throw "MSI did not contain pi-gui.exe" }
 
-      - name: Download previous release installer
-        if: inputs.previous_tag != ''
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          New-Item -ItemType Directory -Path previous-assets -Force | Out-Null
-          gh release download "${{ inputs.previous_tag }}" `
-            --repo "${{ github.repository }}" `
-            --pattern "*setup.exe" `
-            --dir previous-assets
-
       - name: NSIS clean-machine lifecycle
         shell: pwsh
         run: |
@@ -83,16 +66,4 @@ jobs:
             InstallerPath = $installer
             ExpectedVersion = $version
           }
-          if (Test-Path previous-assets) {
-            $arguments.PreviousInstallerPath = (Get-ChildItem previous-assets -Filter "*setup.exe" | Select-Object -First 1).FullName
-          }
           ./scripts/windows-installer-smoke.ps1 @arguments
-
-      - name: Upload unsigned Windows candidate
-        uses: actions/upload-artifact@v4
-        with:
-          name: pi-gui-windows-unsigned-candidate
-          if-no-files-found: error
-          path: |
-            src-tauri/target/release/bundle/nsis/*setup.exe
-            src-tauri/target/release/bundle/msi/*.msi

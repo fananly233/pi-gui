@@ -16,6 +16,12 @@ function requireIncludes(value, expected, label) {
 	}
 }
 
+function rejectIncludes(value, rejected, label) {
+	if (value.includes(rejected)) {
+		throw new Error(`${label}: contains forbidden marker ${JSON.stringify(rejected)}`);
+	}
+}
+
 function requireOrder(value, markers, label) {
 	let previousIndex = -1;
 	for (const marker of markers) {
@@ -39,8 +45,10 @@ const metainfo = fs.readFileSync("src-tauri/linux/com.pi.gui.metainfo.xml", "utf
 const iconSourcePath = "assets/branding/pi-gui-icon.svg";
 const inheritedIconSourcePath = "assets/branding/pi-desktop-icon.svg";
 const releaseWorkflow = fs.readFileSync(".github/workflows/release.yml", "utf8");
-const releaseSmokeWorkflow = fs.readFileSync(".github/workflows/release-smoke.yml", "utf8");
-const gitignore = fs.readFileSync(".gitignore", "utf8");
+const cleanMachineWorkflow = fs.readFileSync(".github/workflows/windows-clean-machine.yml", "utf8");
+const releaseTemplate = fs.readFileSync(".github/RELEASE_TEMPLATE.md", "utf8");
+const readme = fs.readFileSync("README.md", "utf8");
+const distributionPolicy = fs.readFileSync("docs/SIGNING.md", "utf8");
 const repositoryUrl = "https://github.com/fananly233/pi-gui";
 
 requireMatch(packageJson.name, "pi-gui", "npm package name");
@@ -71,14 +79,9 @@ requireMatch(
 );
 for (const property of ["certificateThumbprint", "timestampUrl", "signCommand"]) {
 	if (Object.hasOwn(tauriConfig.bundle.windows, property)) {
-		throw new Error(`checked-in Tauri config must not define Windows signing property: ${property}`);
+		throw new Error(`source-only policy forbids checked-in Windows signing property: ${property}`);
 	}
 }
-requireIncludes(
-	gitignore,
-	"src-tauri/tauri.release.windows.conf.json",
-	"runner-only Windows signing config ignore rule",
-);
 
 const cargoName = cargoToml.match(/^name = "([^"]+)"/m)?.[1];
 const cargoVersion = cargoToml.match(/^version = "([^"]+)"/m)?.[1];
@@ -120,56 +123,51 @@ if (!iconSource.includes("GUI wordmark") || iconSource.includes("DESK wordmark")
 	throw new Error("Pi GUI icon source does not contain the reviewed GUI wordmark");
 }
 
+if (fs.existsSync(".github/workflows/release-smoke.yml")) {
+	throw new Error("source-only policy forbids a binary release-smoke workflow");
+}
 requireOrder(
 	releaseWorkflow,
-	[
-		"Require Windows signing configuration",
-		"Validate source and release metadata",
-		"Import Windows PFX and create runner-only Tauri config",
-		"Build signed Windows bundles",
-		"Verify and stage Windows signatures",
-		"Upload verified release assets",
-		"Create or update draft",
-	],
-	"signed-release workflow",
+	["Validate source policy and repository", "Create or update source-only draft"],
+	"source-only release workflow",
 );
 for (const marker of [
-	'WINDOWS_SIGNING_MODE -ne "pfx"',
-	"WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}",
-	"WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}",
-	"WINDOWS_EXPECTED_SIGNER_SUBJECT: ${{ vars.WINDOWS_EXPECTED_SIGNER_SUBJECT }}",
-	"WINDOWS_TIMESTAMP_URL: ${{ vars.WINDOWS_TIMESTAMP_URL }}",
-	'certificateThumbprint = $signer.Thumbprint',
-	'timestampUrl = $env:WINDOWS_TIMESTAMP_URL',
-	"--bundles nsis,msi --config src-tauri/tauri.release.windows.conf.json",
-	"needs: [validate-release, bundle-and-verify]",
+	"name: Source-only Release",
+	"npm run check:publish",
+	"npm run check:release",
+	"--verify-tag",
+	"--draft",
+	"--json assets",
+	"Source-only draft",
 ]) {
-	requireIncludes(releaseWorkflow, marker, "legacy exportable-PFX release route");
+	requireIncludes(releaseWorkflow, marker, "source-only release workflow");
 }
-for (const marker of ["Verify and stage macOS", "Verify and stage Linux", "pi-gui-release-macos", "pi-gui-release-linux"]) {
-	if (releaseWorkflow.includes(marker)) {
-		throw new Error(`Windows-only 0.1.0 release workflow contains unsupported marker: ${marker}`);
-	}
+for (const marker of [
+	"actions/upload-artifact",
+	"actions/download-artifact",
+	"gh release upload",
+	"tauri -- build",
+	"--bundles",
+	"WINDOWS_CERTIFICATE",
+	"WINDOWS_SIGNING_MODE",
+	"WINDOWS_EXPECTED_SIGNER_SUBJECT",
+	"WINDOWS_TIMESTAMP_URL",
+	"certificateThumbprint",
+	"signCommand",
+]) {
+	rejectIncludes(releaseWorkflow, marker, "source-only release workflow");
 }
-for (const marker of ["smoke-macos:", "smoke-linux:"]) {
-	if (releaseSmokeWorkflow.includes(marker)) {
-		throw new Error(`Windows-only 0.1.0 smoke workflow contains unsupported job: ${marker}`);
-	}
+for (const marker of ["actions/upload-artifact", "gh release download", "previous_tag"]) {
+	rejectIncludes(cleanMachineWorkflow, marker, "ephemeral clean-machine workflow");
 }
-if (!releaseSmokeWorkflow.includes("smoke-windows:")) {
-	throw new Error("Windows-only 0.1.0 smoke workflow is missing smoke-windows");
+for (const [content, marker, label] of [
+	[releaseTemplate, "This release contains source code only.", "release template"],
+	[releaseTemplate, "zero attached assets", "release template"],
+	[readme, "仅发布源码", "README source-only notice"],
+	[distributionPolicy, "Source-only", "distribution policy"],
+]) {
+	requireIncludes(content, marker, label);
 }
-requireOrder(
-	releaseSmokeWorkflow,
-	[
-		"Download current release assets",
-		"Require valid Windows signatures",
-		"Verify MSI contents",
-		"Verify NSIS lifecycle",
-	],
-	"signed Windows release smoke workflow",
-);
-requireIncludes(releaseSmokeWorkflow, "RequireSignature = $true", "signed Windows lifecycle gate");
 
 const releaseTag = process.env.RELEASE_TAG?.trim();
 if (releaseTag) {
@@ -177,5 +175,5 @@ if (releaseTag) {
 }
 
 console.log(
-	`RELEASE_METADATA=PASS name=${packageJson.name} version=${packageJson.version} id=${tauriConfig.identifier} signingRoute=legacy-exportable-pfx credentials=not-read`,
+	`RELEASE_METADATA=PASS name=${packageJson.name} version=${packageJson.version} id=${tauriConfig.identifier} distribution=source-only binaryAssets=forbidden credentials=not-read`,
 );

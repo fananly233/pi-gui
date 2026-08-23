@@ -1,60 +1,45 @@
-# Pi GUI Release TODO
+# Pi GUI Source Release TODO
 
 Last updated: 2026-08-23.
 
-This file tracks Pi GUI only. Gustav's historical v1 release and issue records remain available in Git history and are not Pi GUI release evidence.
+This file tracks Pi GUI only. Gustav's historical releases and issue records remain upstream history rather than Pi GUI evidence.
 
-## Completed preparation
+## Completed product and repository work
 
-- [x] Establish independent identity: `Pi GUI`, `pi-gui`, `com.pi.gui`, version `0.1.0`.
-- [x] Keep Gustav MIT and DLYZZT Apache-2.0 attribution and modification notices.
-- [x] Build local Windows NSIS/MSI candidates and record exact local-only evidence.
-- [x] Add Windows clean-machine candidate and signed release-smoke workflows.
-- [x] Make the signed-release workflow verify both supported Windows artifacts before it can create a draft.
-- [x] Refresh README, contribution, security, roadmap, package/theme, and release documentation to match the React/Tauri implementation.
-- [x] Add ignore rules and a repeatable `npm run check:publish` privacy gate.
-- [x] Keep six donor-only issue/development logs as ignored local files and remove them from the public Git index.
-- [x] Confirm the local migration prompt is ignored and never entered Git history.
-- [x] Confirm current `HEAD` history has no common key/token/private-key/credential-URL pattern hits.
-- [x] With explicit maintainer approval, rewrite all 26 post-fork commits to the public GitHub identity and noreply author/committer email without changing source trees, subjects, dates, or topology.
-- [x] Pass `npm run check:publish` across 150 tracked/non-ignored candidate files after the Phase 9 source and documentation additions.
-- [x] Diagnose and harden the Windows PTY timeout: the test now waits for cold PowerShell to emit DSR before replying with CPR, covers the `cmd.exe` fallback, and the current serial suite passes 25 tests with one network gate ignored.
-- [x] Isolate mutable auth/settings/models/session state in all five real-Pi/runtime gates and verify the real Pi files remain unchanged.
-- [x] Give isolated real-Pi gates the same five-minute startup-readiness budget as the desktop when Pi installs configured packages before consuming RPC input.
-- [x] Complete the local native Phase 9 matrix for chat, sessions, files, models/auth, PTY, Git/worktrees, ecosystem, runtime, themes, windows, and child-process cleanup.
-- [x] Replace unsafe WebView confirmations, add an RPC readiness handshake, refresh models on ready transitions, and isolate native app/WebView data during acceptance tests.
+- [x] Establish the independent `Pi GUI` / `pi-gui` / `com.pi.gui` / `0.1.0` identity.
+- [x] Preserve Gustav MIT and DLYZZT Apache-2.0 attribution and modification notices.
+- [x] Implement Phases 1–8 on the Tauri/React/Pi RPC architecture.
+- [x] Complete Phase 9 deterministic, real-Pi, native, PTY, and clean-machine stabilization.
+- [x] Merge PR #1 with a two-parent merge and verify that its tree matches the reviewed head.
+- [x] Use the public GitHub identity and noreply author/committer metadata for active Pi GUI history.
+- [x] Add and pass the repository privacy/secret gate; keep the local migration prompt and donor-only notes ignored.
+- [x] Configure the independent origin and private vulnerability reporting.
+- [x] Record the maintainer's acceptance of PR #1's immutable metadata-only residual.
 
-## Blocking before first public push
+## Source-only policy transition
 
-- [x] Review the final staged diff and `git diff --check`.
-- [x] Commit the documentation/privacy pass with the repository-local noreply identity (`df39d05`).
-- [x] Create the independent public repository at `https://github.com/fananly233/pi-gui`.
-- [x] Add its credential-free URL as `origin`; keep `gustav` and `dlyzzt` as donor remotes.
-- [x] Push only the reviewed Pi GUI history to `origin/main`; do not push `archive/electron-mvp`, use `--all`, or use `--mirror`.
-- [x] Replace placeholder repository references with the independent repository URL.
-- [x] Enable and verify GitHub private vulnerability reporting through GitHub's dedicated API.
-- [x] Replace the inherited `Pi DESK` wordmark/source filename with reviewable Pi GUI artwork and regenerate the platform icon set.
+- [x] Record the maintainer decision to distribute source code only.
+- [x] Remove the signed Windows release-smoke workflow.
+- [x] Replace the signed binary release workflow with an exact-tag, zero-asset source draft workflow.
+- [x] Stop the clean-machine workflow from downloading or uploading installer artifacts.
+- [x] Convert `npm run check:release` into a source-only policy guard.
+- [x] Update README, release criteria, roadmap, changelog, security, mapping, and release documentation.
+- [x] Keep Tauri packaging and clean-machine lifecycle checks available for local/ephemeral engineering QA.
+- [x] Keep all signing credentials unconfigured and out of scope.
 
-## Blocking before public release
+## Before the first source release
 
-- [x] Harden the real-PTY test to wait for the observed DSR before replying, cover the Windows `cmd.exe` fallback, and prove both paths across six independent test-process runs.
-- [x] Re-run **Windows Clean-Machine Candidate** from the independent repository against signed-release hardening commit `03d064b`.
-- [x] Record successful install, launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation evidence.
-- [x] Re-run CI and **Windows Clean-Machine Candidate** for Phase 9 runtime/source commit `867ac37`; both passed on fresh GitHub-hosted runners.
-- [x] Lock `0.1.0` to signed Windows NSIS/MSI release assets; macOS and Linux remain unsupported source-build targets for this version.
-- [x] Merge PR #1 with a two-parent merge commit, verify its tree matches the reviewed head, and keep the RC branch available.
-- [x] Keep the active `main` merge metadata on the GitHub noreply identity and pass `npm run check:publish` after integration.
-- [x] Pass mainline CI and **Windows Clean-Machine Candidate** for `3bb7cc411467fece7d5dbe5edf083d78a836a456`.
-- [x] Audit the Windows signing routes and add a credential-free preflight for the checked-in PFX gate, verification order, and Windows-only artifact scope.
-- [x] With explicit maintainer approval, move the entire known local `%TEMP%\pi-gui-phase9-ui-e97f42c987594cce899a018465edcc3f` fixture to the Recycle Bin and verify its original Pi configuration paths absent; the app-data quarantine and unrelated Phase 10A native-test directories remained untouched.
-- [x] Record the maintainer's explicit acceptance of PR #1's obsolete metadata-only merge object; no GitHub Support cleanup request is being pursued for `0.1.0`.
-- [ ] Select the Windows signing route: eligible exportable PFX, or a separately reviewed provider-specific `signCommand` implementation.
-- [ ] Configure Windows Authenticode signing for NSIS and MSI only after the route is selected.
-- [ ] Build a draft release from the intended tag.
-- [ ] Run **Signed Windows Release Smoke** against the exact draft assets.
-- [x] Record the candidate commit, workflow URLs, unsigned status, local hashes, hosted artifact, and known limitations in `docs/RELEASES.md`.
-- [ ] Publish only after every required release criterion passes.
+- [ ] Review and merge the source-only policy branch after CI passes.
+- [ ] Run `npm run check:publish`, `npm run check:release`, deterministic tests, Rust checks/tests, frontend build, dependency audit, and `git diff --check` on the exact `main` commit.
+- [ ] Confirm release notes retain derivative attribution and clearly state that no official binaries are provided.
+- [ ] Obtain explicit maintainer approval before creating `v0.1.0`.
+- [ ] Let **Source-only Release** create the draft and verify that it has zero attached assets.
+- [ ] Confirm the only downloads are GitHub-generated source ZIP and tarball archives.
+- [ ] Publish the reviewed draft manually.
 
-## First-release limitation
+## Explicitly out of scope
 
-There is no earlier Pi GUI application identity to upgrade from. Version `0.1.0` can prove same-version update/reinstall; a true cross-version installer upgrade becomes mandatory for the next release.
+- Authenticode or other platform signing identities;
+- GitHub Release attachments such as EXE, MSI, MSIX, DMG, AppImage, DEB, RPM, or updater payloads;
+- package-manager binaries and automatic installer updates;
+- treating local or Actions-built packages as supported downloads.
