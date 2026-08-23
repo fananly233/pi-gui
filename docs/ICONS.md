@@ -2,15 +2,15 @@
 
 This document defines how Pi GUI app icons are maintained and regenerated.
 
-> Release note: the source filename and current **Pi DESK** artwork are inherited from the Gustav base. They remain the build input for `0.1.0` development bundles, but final Pi GUI branding must be reviewed before a public release. Do not infer release readiness from regenerated icon files alone.
+The first Pi GUI release uses a derivative of the Gustav icon: the Pi monogram is retained and the inherited `DESK` wordmark is replaced with `GUI`. The source remains plain SVG so the lineage and project-specific changes are reviewable.
 
 ## Source of truth
 
-- Primary source artwork: `assets/branding/pi-desktop-icon.svg`
+- Primary source artwork: `assets/branding/pi-gui-icon.svg`
 
-Current source uses a handcrafted **Pi DESK** mark:
+Current source uses a handcrafted **Pi GUI** mark:
 - Pi monogram in high-contrast white on near-black background
-- Pixel `DESK` wordmark drawn from a fixed grid (no runtime/system font dependency)
+- Pixel `GUI` wordmark drawn from a fixed grid (no runtime/system font dependency)
 - Square composition optimized for app launcher readability
 
 Keep this file square, simple, and high-contrast. Avoid thin strokes, gradients, and micro-details that disappear at 32px.
@@ -20,7 +20,7 @@ Keep this file square, simple, and high-contrast. Avoid thin strokes, gradients,
 From repo root:
 
 ```bash
-npx tauri icon assets/branding/pi-desktop-icon.svg -o src-tauri/icons
+npx tauri icon assets/branding/pi-gui-icon.svg -o src-tauri/icons
 ```
 
 This regenerates:
@@ -34,7 +34,7 @@ This regenerates:
 After regenerating icons:
 
 1. Commit both source and generated outputs:
-   - `assets/branding/pi-desktop-icon.svg`
+   - `assets/branding/pi-gui-icon.svg`
    - `src-tauri/icons/**`
 2. Build checks:
    - `npm run check`
