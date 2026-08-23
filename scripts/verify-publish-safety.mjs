@@ -169,7 +169,7 @@ if (!git(["remote"]).split(/\r?\n/).includes("origin")) {
 
 try {
 	git(["show-ref", "--verify", "refs/heads/archive/electron-mvp"]);
-	warn("archive/electron-mvp is local-only; push the reviewed Pi GUI branch, never --all or --mirror");
+	warn("archive/electron-mvp and inherited donor tags are local-only; push only reviewed Pi GUI refs, never --all, --mirror, or --tags");
 } catch {
 	// The optional local archive does not exist in every clone.
 }

@@ -24,7 +24,7 @@ Remaining `0.1.0` work:
 
 1. merge the source-only policy and automation changes after CI passes;
 2. run the final source/privacy gates on the exact `main` commit;
-3. with explicit approval, create `v0.1.0`, inspect the zero-asset draft, and publish only the GitHub-generated source archives.
+3. with explicit approval, create `pi-gui-v0.1.0`, inspect the zero-asset draft, and publish only the GitHub-generated source archives.
 
 ## After 0.1
 

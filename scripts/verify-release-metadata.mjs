@@ -133,6 +133,8 @@ requireOrder(
 );
 for (const marker of [
 	"name: Source-only Release",
+	'"pi-gui-v*"',
+	"^pi-gui-v",
 	"npm run check:publish",
 	"npm run check:release",
 	"--verify-tag",
@@ -171,7 +173,7 @@ for (const [content, marker, label] of [
 
 const releaseTag = process.env.RELEASE_TAG?.trim();
 if (releaseTag) {
-	requireMatch(releaseTag, `v${packageJson.version}`, "release tag");
+	requireMatch(releaseTag, `pi-gui-v${packageJson.version}`, "release tag");
 }
 
 console.log(

@@ -35,6 +35,8 @@ Never commit:
 
 Run `npm run check:publish` before the first public push and before release. The command reports only categories and paths; it does not print suspected secret values.
 
+Migration checkouts may contain local donor `v*` tags. Pi GUI release tags use `pi-gui-v*`; never publish with `git push --tags`, `--all`, or `--mirror`.
+
 ## Development rules
 
 - Keep changes small and scoped.

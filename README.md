@@ -83,6 +83,7 @@ Windows 本地构建产物位于 `src-tauri/target/release/bundle/`。这些文�
 - 生命周期日志不记录 prompt、模型输出、凭据或环境变量；
 - 当前代码没有集成 analytics/telemetry SDK，但 Pi 调用模型、检查 runtime 更新或下载 runtime 时仍会按功能需要联网；
 - `.env`、Pi/Codex 本地状态、认证文件、签名私钥、日志和本地主控提示词均被忽略；正式推送前运行 `npm run check:publish`；
+- 迁移工作区可能保留 donor 的本地 `v*` 标签；不要运行 `git push --tags`。Pi GUI 自有源码标签使用 `pi-gui-v*` 前缀，并且只能单独推送已审阅的标签；
 - 应用拥有工作区文件和本地进程权限，请只连接你信任的目录和 package。详细边界见 [docs/PERMISSIONS.md](./docs/PERMISSIONS.md)。
 
 ## 开发与验证

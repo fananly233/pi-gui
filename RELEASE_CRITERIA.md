@@ -25,7 +25,7 @@ Pi GUI `0.1.0` is a source-only release candidate. A public Release may contain 
 ## 3. Deterministic source gate
 
 ```powershell
-$env:RELEASE_TAG = "v0.1.0"
+$env:RELEASE_TAG = "pi-gui-v0.1.0"
 npm ci
 npm run check:publish
 npm run check:release
@@ -58,6 +58,7 @@ The Phase 9 and Phase 10A records establish the current real-Pi, native Tauri, a
 
 - [x] `.github/workflows/release.yml` validates an existing exact tag and creates or updates only a draft.
 - [x] The release workflow contains no application build, signing, artifact upload, or release-asset upload step.
+- [x] Pi GUI release tags use `pi-gui-v*`, avoiding collisions with inherited donor `v*` tags.
 - [x] `.github/workflows/release-smoke.yml` is absent because there are no binary release assets to test.
 - [x] `.github/workflows/windows-clean-machine.yml` retains ephemeral lifecycle QA but does not download or upload installer artifacts.
 - [x] `npm run check:release` rejects reintroduction of the retired binary publishing path.
@@ -68,7 +69,7 @@ Code signing is not a source-release gate. No signer identity, certificate, time
 ## 6. Publish decision
 
 - [ ] The intended source commit is merged to `main` and CI passes on that exact commit.
-- [ ] The maintainer explicitly authorizes creation of the exact `v0.1.0` tag.
+- [ ] The maintainer explicitly authorizes creation of the exact `pi-gui-v0.1.0` tag on the reviewed `main` commit.
 - [ ] **Source-only Release** passes for that tag and creates a draft.
 - [ ] The draft has zero attached assets and shows only GitHub-generated source ZIP/tarball downloads.
 - [ ] Release notes contain lineage, source-build prerequisites, limitations, and verification links.

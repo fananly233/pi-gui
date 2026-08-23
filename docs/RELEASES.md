@@ -8,6 +8,8 @@ Pi GUI `0.1.0` is an unpublished **source-only** release candidate. The independ
 
 The maintainer decided that Pi GUI will publish source code only. There will be no official Windows, macOS, or Linux executable, installer, application bundle, package-manager binary, or updater payload. A future `0.1.0` GitHub Release may expose only GitHub-generated source ZIP and tarball downloads for the exact tag, with zero attached assets.
 
+This migration checkout retains local `v*` tags fetched from donor repositories, including a donor `v0.1.0`; `origin` has no tags. Pi GUI therefore uses the distinct `pi-gui-v*` namespace. Never run `git push --tags`, `--all`, or `--mirror`, and never reuse an inherited donor tag as a Pi GUI release ref.
+
 ## Distribution contract
 
 - The public repository and version tags are the source of truth.
@@ -61,7 +63,7 @@ The detailed Phase 9 evidence remains in [RC_ACCEPTANCE.md](./RC_ACCEPTANCE.md).
 ## Required source gates
 
 ```powershell
-$env:RELEASE_TAG = "v0.1.0"
+$env:RELEASE_TAG = "pi-gui-v0.1.0"
 npm ci
 npm run check:publish
 npm run check:release
@@ -89,8 +91,8 @@ npm run gate:runtime-real
 1. Confirm `package.json`, Cargo, Tauri, Linux metainfo, and the intended tag agree.
 2. Run the source gates and review the final diff and commit metadata.
 3. Confirm README, `THIRD_PARTY_NOTICES.md`, license files, and release notes retain donor attribution.
-4. Push only the reviewed Pi GUI branch. Never push `archive/electron-mvp`, `--all`, or `--mirror`.
-5. With explicit maintainer approval, create the exact version tag.
+4. Push only the reviewed Pi GUI branch. Never push `archive/electron-mvp`, inherited donor tags, `--tags`, `--all`, or `--mirror`.
+5. With explicit maintainer approval, create the exact `pi-gui-v0.1.0` tag on the reviewed `main` commit and push only that single tag ref.
 6. Let **Source-only Release** validate the tag and create a draft with no attached assets.
 7. Confirm the draft exposes only GitHub-generated source archives, then publish it manually.
 

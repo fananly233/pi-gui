@@ -197,6 +197,7 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | --- | --- | --- |
 | Maintainer distribution decision | PASS | Pi GUI will publish source code only. Official installers, application bundles, package-manager binaries, and updater payloads are out of scope. |
 | Release workflow boundary | PASS | The exact-tag workflow creates only a zero-asset source draft; binary builds, signing inputs, artifact uploads, and release-asset uploads were removed. |
+| Tag namespace isolation | PASS | Pi GUI source releases use `pi-gui-v*`; inherited donor `v*` tags stay local and must never be pushed with `--tags`, `--all`, or `--mirror`. |
 | Clean-machine boundary | PASS | Windows lifecycle QA still builds and tests ephemeral installers but no longer downloads prior Release installers or uploads current outputs. |
 | Signing and identity exposure | NOT APPLICABLE | No signing identity or credential is required or configured because no official binary is distributed. |
 | Publication state | NOT RUN | No tag, draft, or Release was created by the policy change. Publication remains a separate explicit maintainer action. |

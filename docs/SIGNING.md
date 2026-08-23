@@ -26,7 +26,7 @@ The source-only policy supersedes the earlier Phase 10B investigation of Authent
 - the clean-machine engineering workflow downloads or uploads installer artifacts;
 - the README, release template, or this policy stops declaring source-only distribution.
 
-`.github/workflows/release.yml` validates an existing exact version tag and creates or updates a draft with no attached files. GitHub supplies the standard source ZIP and tarball from the tag when the Release is published. The workflow refuses to update an existing draft if it already has attached assets.
+`.github/workflows/release.yml` validates an existing exact `pi-gui-v*` version tag and creates or updates a draft with no attached files. The prefix avoids collisions with local `v*` tags inherited from donor repositories. GitHub supplies the standard source ZIP and tarball from the tag when the Release is published. The workflow refuses to update an existing draft if it already has attached assets.
 
 `.github/workflows/windows-clean-machine.yml` may still build installers temporarily to test install, launch, update/reinstall, uninstall, and app-data preservation. Those files remain ephemeral on the hosted runner and are not uploaded or treated as release assets.
 
