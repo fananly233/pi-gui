@@ -102,6 +102,7 @@ export class PiAdapter {
 	private currentGeneration: number | null = null;
 	private connected = false;
 	private starting = false;
+	private startupInFlight = false;
 	private buffered: BufferedEnvelope[] = [];
 	private subscribers = new Set<(event: PiAdapterEvent) => void>();
 	private pending = new Map<string, PendingRequest>();
@@ -126,13 +127,14 @@ export class PiAdapter {
 	}
 
 	async start(options: PiStartOptions): Promise<RpcStartResult> {
-		if (this.starting) throw new Error("Pi RPC is already starting.");
-		await this.ensureListeners();
-		this.starting = true;
-		this.buffered = [];
+		if (this.startupInFlight) throw new Error("Pi RPC is already starting.");
+		this.startupInFlight = true;
 		let spawned = false;
 
 		try {
+			await this.ensureListeners();
+			this.starting = true;
+			this.buffered = [];
 			const result = await invoke<RpcStartResult>("rpc_start", {
 				options: {
 					cwd: options.cwd,
@@ -160,6 +162,8 @@ export class PiAdapter {
 			if (spawned) await invoke("rpc_stop", { instanceId: this.instanceId }).catch(() => undefined);
 			this.currentGeneration = null;
 			throw error;
+		} finally {
+			this.startupInFlight = false;
 		}
 	}
 

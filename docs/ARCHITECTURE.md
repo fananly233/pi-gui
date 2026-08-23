@@ -62,7 +62,7 @@ RPC transport is strict LF-delimited JSONL. After Rust spawns Pi, the adapter wa
 
 Credential values, prompts, model output, and environment variables are excluded from runtime diagnostics and lifecycle logs.
 
-Native acceptance tests may set `PI_GUI_DATA_DIR` to an absolute, non-root disposable directory so Rust app data does not touch the normal profile. Windows tests also set WebView2's `WEBVIEW2_USER_DATA_FOLDER` to a disposable directory. These are host-side test-isolation controls, not renderer capabilities or normal user configuration.
+Native acceptance tests set `PI_CODING_AGENT_DIR` for Pi sessions/configuration and may set `PI_GUI_DATA_DIR` to an absolute, non-root disposable directory without parent components so Rust app data does not touch the normal profile. Windows tests also set WebView2's `WEBVIEW2_USER_DATA_FOLDER` to a disposable directory. These are host-side test-isolation controls, not renderer capabilities or normal user configuration.
 
 ## Models and authentication
 

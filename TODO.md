@@ -18,7 +18,7 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Confirm current `HEAD` history has no common key/token/private-key/credential-URL pattern hits.
 - [x] With explicit maintainer approval, rewrite all 26 post-fork commits to the public GitHub identity and noreply author/committer email without changing source trees, subjects, dates, or topology.
 - [x] Pass `npm run check:publish` across 150 tracked/non-ignored candidate files after the Phase 9 source and documentation additions.
-- [x] Diagnose and harden the Windows PTY timeout: the test now waits for cold PowerShell to emit DSR before replying with CPR, covers the `cmd.exe` fallback, and the final serial suite passes 24 tests with one network gate ignored.
+- [x] Diagnose and harden the Windows PTY timeout: the test now waits for cold PowerShell to emit DSR before replying with CPR, covers the `cmd.exe` fallback, and the current serial suite passes 25 tests with one network gate ignored.
 - [x] Isolate mutable auth/settings/models/session state in all five real-Pi/runtime gates and verify the real Pi files remain unchanged.
 - [x] Complete the local native Phase 9 matrix for chat, sessions, files, models/auth, PTY, Git/worktrees, ecosystem, runtime, themes, windows, and child-process cleanup.
 - [x] Replace unsafe WebView confirmations, add an RPC readiness handshake, refresh models on ready transitions, and isolate native app/WebView data during acceptance tests.

@@ -24,7 +24,7 @@ The Phase 9 code tip passed on Windows x86_64:
 | `npm ci` | PASS; locked dependency graph installed with zero reported vulnerabilities. |
 | `RELEASE_TAG=v0.1.0 npm run check:release` | PASS. |
 | `npm run check` | PASS. |
-| `npm test` | PASS; 23 tests. |
+| `npm test` | PASS; 25 tests. |
 | `npm run build:frontend` | PASS. |
 | `cargo fmt --check` | PASS. |
 | `cargo check --locked` | PASS. |
@@ -76,12 +76,13 @@ For a disposable native run, use unique paths and keep them outside the reposito
 
 ```powershell
 $testRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("pi-gui-rc-" + [guid]::NewGuid())
+$env:PI_CODING_AGENT_DIR = Join-Path $testRoot "pi-agent"
 $env:PI_GUI_DATA_DIR = Join-Path $testRoot "app-data"
 $env:WEBVIEW2_USER_DATA_FOLDER = Join-Path $testRoot "webview2"
 npm run tauri dev
 ```
 
-`PI_GUI_DATA_DIR` is a test-only host override. `WEBVIEW2_USER_DATA_FOLDER` is the corresponding Windows WebView2 isolation control. Neither is exposed to the renderer or recommended as ordinary user configuration.
+Populate the disposable `PI_CODING_AGENT_DIR` with only the Pi configuration required for the acceptance run; never point this test at the live Pi agent directory. `PI_GUI_DATA_DIR` is a test-only host override and rejects filesystem roots or parent-directory components. `WEBVIEW2_USER_DATA_FOLDER` is the corresponding Windows WebView2 isolation control. None is exposed to the renderer or recommended as ordinary user configuration.
 
 During the final isolated rerun, runtime diagnostics pointed only to the disposable app-data root. The pre-existing normal runtime log and real Pi auth/settings files retained identical size, timestamp, and SHA-256 values. The isolated lifecycle log contained only `desktop_started`, `rpc_started`, `rpc_exited`, and `desktop_stopped` events.
 

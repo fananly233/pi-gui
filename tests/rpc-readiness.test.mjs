@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
 	PI_RPC_REQUEST_TIMEOUT_MS,
@@ -27,4 +28,17 @@ test("startup readiness preserves probe failures", async () => {
 		}),
 		/startup probe failed/,
 	);
+});
+
+test("PiAdapter keeps a distinct start lock through the readiness handshake", async () => {
+	const source = await readFile(new URL("../src/pi/pi-adapter.ts", import.meta.url), "utf8");
+	const guard = source.indexOf("if (this.startupInFlight)");
+	const acquire = source.indexOf("this.startupInFlight = true", guard);
+	const handshake = source.indexOf("await waitForPiRpcReady", acquire);
+	const release = source.indexOf("this.startupInFlight = false", handshake);
+
+	assert.ok(guard >= 0, "missing concurrent-start guard");
+	assert.ok(acquire > guard, "start lock must be acquired after the guard");
+	assert.ok(handshake > acquire, "readiness handshake must run while the start lock is held");
+	assert.ok(release > handshake, "start lock must be released after the readiness handshake");
 });

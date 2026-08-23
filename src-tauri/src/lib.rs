@@ -29,7 +29,19 @@ fn validate_app_data_override(
         return Err(format!("{PI_GUI_DATA_DIR_ENV} cannot be empty"));
     }
     let path = PathBuf::from(value);
-    if !path.is_absolute() || path.parent().is_none() {
+    let mut has_normal_component = false;
+    for component in path.components() {
+        match component {
+            Component::Normal(_) => has_normal_component = true,
+            Component::ParentDir => {
+                return Err(format!(
+                    "{PI_GUI_DATA_DIR_ENV} cannot contain parent-directory components"
+                ));
+            }
+            Component::Prefix(_) | Component::RootDir | Component::CurDir => {}
+        }
+    }
+    if !path.is_absolute() || !has_normal_component {
         return Err(format!(
             "{PI_GUI_DATA_DIR_ENV} must be an absolute, non-root directory"
         ));
@@ -4213,12 +4225,14 @@ mod tests {
         assert_eq!(
             validate_app_data_override(Some(valid.clone().into_os_string()))
                 .expect("accept absolute app data override"),
-            Some(valid)
+            Some(valid.clone())
         );
         assert!(validate_app_data_override(Some("relative/path".into())).is_err());
-        assert!(
-            validate_app_data_override(Some(std::path::MAIN_SEPARATOR.to_string().into())).is_err()
-        );
+        #[cfg(windows)]
+        assert!(validate_app_data_override(Some(r"C:\".into())).is_err());
+        #[cfg(not(windows))]
+        assert!(validate_app_data_override(Some("/".into())).is_err());
+        assert!(validate_app_data_override(Some(valid.join("..").into_os_string())).is_err());
         assert_eq!(
             validate_app_data_override(None).expect("allow missing override"),
             None

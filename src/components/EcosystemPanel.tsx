@@ -36,6 +36,7 @@ function resourceTitle(source: PiCommandSource): string {
 
 export function EcosystemPanel({ workspaceRoot, sessionReady, loadCommands, onUseCommand, onClose }: EcosystemPanelProps) {
 	const requestSequence = useRef(0);
+	const mutationLock = useRef(false);
 	const [packages, setPackages] = useState<PiPackageInfo[]>([]);
 	const [commands, setCommands] = useState<PiCommandInfo[]>([]);
 	const [themes, setThemes] = useState<PiThemeInfo[]>([]);
@@ -104,14 +105,17 @@ export function EcosystemPanel({ workspaceRoot, sessionReady, loadCommands, onUs
 	}, [refresh]);
 
 	const finishMutation = async (
-		operation: () => Promise<{ message: string }>,
+		operation: () => Promise<{ message: string } | null>,
 		approveProject = includeProjectPackages,
 	) => {
+		if (mutationLock.current) return false;
+		mutationLock.current = true;
 		setMutating(true);
 		setError(null);
 		setMessage(null);
 		try {
 			const result = await operation();
+			if (!result) return false;
 			setMessage(result.message);
 			await refresh(approveProject);
 			if (sessionReady) setResourcesStale(true);
@@ -120,6 +124,7 @@ export function EcosystemPanel({ workspaceRoot, sessionReady, loadCommands, onUs
 			setError(describeError(nextError));
 			return false;
 		} finally {
+			mutationLock.current = false;
 			setMutating(false);
 		}
 	};
@@ -127,19 +132,23 @@ export function EcosystemPanel({ workspaceRoot, sessionReady, loadCommands, onUs
 	const install = async (event: FormEvent) => {
 		event.preventDefault();
 		if (!workspaceRoot || !source.trim() || mutating) return;
-		const trustNote = scope === "project"
+		const packageSource = source.trim();
+		const packageScope = scope;
+		const trustNote = packageScope === "project"
 			? "\n\nProject scope asks Pi to trust this project's local package configuration for this command."
 			: "";
-		if (!await desktopApi.confirmAction(
-			`Install this ${scope} Pi package?\n\n${source.trim()}\n\nPi packages run with full system access. Review the source before continuing.${trustNote}`,
-			"Install",
-		)) return;
 		const installed = await finishMutation(
-			() => desktopApi.installPiPackage(workspaceRoot, source.trim(), scope),
-			scope === "project" || includeProjectPackages,
+			async () => {
+				if (!await desktopApi.confirmAction(
+					`Install this ${packageScope} Pi package?\n\n${packageSource}\n\nPi packages run with full system access. Review the source before continuing.${trustNote}`,
+					"Install",
+				)) return null;
+				return desktopApi.installPiPackage(workspaceRoot, packageSource, packageScope);
+			},
+			packageScope === "project" || includeProjectPackages,
 		);
 		if (installed) {
-			if (scope === "project") setApprovedProjectWorkspace(workspaceRoot);
+			if (packageScope === "project") setApprovedProjectWorkspace(workspaceRoot);
 			setSource("");
 		}
 	};
@@ -149,29 +158,40 @@ export function EcosystemPanel({ workspaceRoot, sessionReady, loadCommands, onUs
 		const trustNote = entry.scope === "project"
 			? "\n\nPi will trust project-local package configuration for this removal command."
 			: "";
-		if (!await desktopApi.confirmAction(`Remove this ${entry.scope} Pi package?\n\n${entry.source}${trustNote}`, "Remove")) return;
 		await finishMutation(
-			() => desktopApi.removePiPackage(workspaceRoot, entry.source, entry.scope),
+			async () => {
+				if (!await desktopApi.confirmAction(`Remove this ${entry.scope} Pi package?\n\n${entry.source}${trustNote}`, "Remove")) return null;
+				return desktopApi.removePiPackage(workspaceRoot, entry.source, entry.scope);
+			},
 			entry.scope === "project" || includeProjectPackages,
 		);
 	};
 
 	const updateAll = async () => {
 		if (!workspaceRoot || mutating || packages.length === 0) return;
-		if (!await desktopApi.confirmAction("Ask Pi to update all trusted, unpinned packages?\n\nThis may download and execute third-party package code.", "Update")) return;
 		await finishMutation(
-			() => desktopApi.updatePiPackages(workspaceRoot, null, includeProjectPackages),
+			async () => {
+				if (!await desktopApi.confirmAction("Ask Pi to update all trusted, unpinned packages?\n\nThis may download and execute third-party package code.", "Update")) return null;
+				return desktopApi.updatePiPackages(workspaceRoot, null, includeProjectPackages);
+			},
 			includeProjectPackages,
 		);
 	};
 
 	const showProjectPackages = async () => {
-		if (!workspaceRoot) return;
-		if (!await desktopApi.confirmAction(
-			"Allow Pi to read this workspace's project package settings?\n\nThis list command does not run package resources, but project packages still have full system access when Pi loads them.",
-			"Allow",
-		)) return;
-		setApprovedProjectWorkspace(workspaceRoot);
+		if (!workspaceRoot || mutationLock.current) return;
+		mutationLock.current = true;
+		setMutating(true);
+		try {
+			if (!await desktopApi.confirmAction(
+				"Allow Pi to read this workspace's project package settings?\n\nThis list command does not run package resources, but project packages still have full system access when Pi loads them.",
+				"Allow",
+			)) return;
+			setApprovedProjectWorkspace(workspaceRoot);
+		} finally {
+			mutationLock.current = false;
+			setMutating(false);
+		}
 	};
 
 	const resourceGroups: PiCommandSource[] = ["extension", "skill", "prompt"];

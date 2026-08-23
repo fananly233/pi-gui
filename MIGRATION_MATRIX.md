@@ -173,7 +173,7 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 
 | Check | Result | Notes |
 | --- | --- | --- |
-| Deterministic source gates | PASS | Release metadata, TypeScript, frontend build, 23 renderer/domain tests, Cargo format/check, 25 Rust tests, full npm audit, and publish-safety checks passed. One explicit managed-runtime network test remains ignored by the deterministic suite. |
+| Deterministic source gates | PASS | Release metadata, TypeScript, frontend build, 25 renderer/domain tests, Cargo format/check, 25 Rust tests, full npm audit, and publish-safety checks passed. One explicit managed-runtime network test remains ignored by the deterministic suite. |
 | Five real integration gates | PASS | Pi RPC, sessions, models, ecosystem, and managed-runtime gates passed with Pi 0.84.2. Mutable state stayed under disposable roots and the real Pi auth/settings hashes remained unchanged. |
 | Native chat/session/file matrix | PASS | Real Tauri UI covered text/thinking/tool streaming, abort/second prompt, restore/rename/fork/switch, file edit/mention/image, stale-write refusal, binary refusal, and models/auth after ready transition. |
 | PTY, Git, ecosystem, and runtime matrix | PASS | Real PowerShell PTY lifecycle, Git status/diff/worktree creation, resource inventory, system-Pi fallback, maintenance guard, theme/window controls, and shutdown cleanup passed. No shell command was typed through UI automation. |

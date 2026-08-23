@@ -22,3 +22,13 @@ test("native mutations never depend on WebView window.confirm", async () => {
 	assert.match(api, /return\s+await\s+confirmDialog\s*\(/);
 	assert.match(api, /catch\s*\([^)]*\)[\s\S]*return\s+false/);
 });
+
+test("package and worktree mutations hold an immediate lock while awaiting confirmation", async () => {
+	const ecosystem = await readFile(new URL("../src/components/EcosystemPanel.tsx", import.meta.url), "utf8");
+	assert.match(ecosystem, /if \(mutationLock\.current\) return false;\s*mutationLock\.current = true;/);
+	assert.equal((ecosystem.match(/finishMutation\(\s*async \(\) => \{\s*if \(!await desktopApi\.confirmAction/g) ?? []).length, 3);
+
+	const git = await readFile(new URL("../src/components/GitPanel.tsx", import.meta.url), "utf8");
+	assert.match(git, /if \(mutationLock\.current\) return;\s*mutationLock\.current = true;/);
+	assert.match(git, /runMutation\(async \(\) => \{\s*if \(!await desktopApi\.confirmAction/);
+});

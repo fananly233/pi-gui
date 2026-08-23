@@ -80,7 +80,7 @@ Phase 9 source stabilization has passed the local deterministic, five real-Pi/ru
 | --- | --- | --- |
 | Release identity and tag | PASS | `check:release` accepted `v0.1.0` and matched npm, lockfile, Cargo, Tauri, HTML, and Linux metainfo. |
 | Pi GUI icon identity | PASS | The inherited `DESK` wordmark/source filename was replaced with a deterministic `GUI` pixel mark and the complete Tauri icon set was regenerated. |
-| TypeScript and renderer tests | PASS | Strict check plus 23 deterministic tests, including real-gate isolation, RPC readiness, and native-confirmation safety contracts. |
+| TypeScript and renderer tests | PASS | Strict check plus 25 deterministic tests, including real-gate isolation, RPC readiness, exclusive mutation guards, and native-confirmation safety contracts. |
 | Rust check and library tests | PASS | `cargo check --locked` passes. The real PTY test waits until the shell emits DSR before replying with CPR, and a separate Windows test exercises the explicit `cmd.exe` fallback. The current serial library run passed 25 tests with one managed-runtime network gate ignored. |
 | Frontend production build | PASS | 320 modules built. |
 | Full dependency audit | PASS | Zero reported production or development dependency vulnerabilities after updating the locked Vite 7 toolchain within its existing major version. |
