@@ -206,7 +206,7 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 
 | Check | Result | Notes |
 | --- | --- | --- |
-| PR #2 integration | PASS | Active merge `26ca58662b33d0f8c85d5ca54a400b79557e2765` has the reviewed base and source-policy head as two parents and the exact reviewed tree. Active author and committer metadata use the approved public noreply identity. |
+| PR #2 integration | PASS | Active merge `26ca58662b33d0f8c85d5ca54a400b79557e2765` has base `c8f072fc89b7b70b6e220b640cf0f3064cd55b5b` and reviewed source-policy head `fba2f250a4080605dc7d2183e02d31491da6eb09` as its two parents and preserves the exact reviewed tree. Active author and committer metadata use the approved public noreply identity. |
 | Mainline CI | PASS | [CI #19](https://github.com/fananly233/pi-gui/actions/runs/32672786127) passed on the active merge and retained no artifact. |
 | Hosted lifecycle | PASS | [Windows clean-machine #7](https://github.com/fananly233/pi-gui/actions/runs/32672896200) passed candidate validation, ephemeral installer build, MSI extraction, and NSIS install/launch/update/uninstall. The run retained no artifact. |
 | Historical artifact cleanup | PASS | Artifact IDs `9496313691`, `9498181296`, and `9499997749` were permanently deleted after explicit maintainer confirmation. Fresh API queries return empty artifact lists for all three source runs; workflow logs remain available. |

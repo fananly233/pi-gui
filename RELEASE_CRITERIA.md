@@ -53,7 +53,7 @@ npm run gate:ecosystem-real
 npm run gate:runtime-real
 ```
 
-The Phase 9 and Phase 10A records establish the real-Pi and native Tauri baseline. Phase 10C revalidated the source-policy merge through mainline CI and an artifact-free hosted clean-machine lifecycle. A documentation/workflow-only source-policy change does not require rerunning mutable integration gates, but it must not claim new runtime evidence.
+The Phase 9 and Phase 10A records establish the real-Pi and native Tauri baseline. Phase 10C revalidated the source-policy merge through mainline CI and an artifact-free hosted clean-machine lifecycle. A documentation/workflow-only source-policy change does not require rerunning mutable real-Pi/runtime gates, but it must not claim new real-Pi/runtime evidence.
 
 ## 5. Source-only automation
 
