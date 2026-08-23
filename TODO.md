@@ -34,7 +34,7 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 ## Blocking before public release
 
 - [x] Harden the real-PTY test to wait for the observed DSR before replying, cover the Windows `cmd.exe` fallback, and prove both paths across six independent test-process runs.
-- [x] Run **Windows Clean-Machine Candidate** from the independent repository against `582c662`.
+- [x] Re-run **Windows Clean-Machine Candidate** from the independent repository against signed-release hardening commit `03d064b`.
 - [x] Record successful install, launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation evidence.
 - [ ] Configure Windows Authenticode signing for NSIS and MSI.
 - [ ] Configure macOS signing and notarization.
