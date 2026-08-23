@@ -16,6 +16,9 @@ const tauriConfig = readJson("src-tauri/tauri.conf.json");
 const cargoToml = fs.readFileSync("src-tauri/Cargo.toml", "utf8");
 const indexHtml = fs.readFileSync("index.html", "utf8");
 const metainfo = fs.readFileSync("src-tauri/linux/com.pi.gui.metainfo.xml", "utf8");
+const iconSourcePath = "assets/branding/pi-gui-icon.svg";
+const inheritedIconSourcePath = "assets/branding/pi-desktop-icon.svg";
+const releaseWorkflow = fs.readFileSync(".github/workflows/release.yml", "utf8");
 const repositoryUrl = "https://github.com/fananly233/pi-gui";
 
 requireMatch(packageJson.name, "pi-gui", "npm package name");
@@ -72,6 +75,30 @@ for (const url of [repositoryUrl, `${repositoryUrl}/issues`]) {
 	if (!metainfo.includes(`>${url}</url>`)) {
 		throw new Error(`Linux metainfo does not declare ${url}`);
 	}
+}
+
+if (!fs.existsSync(iconSourcePath)) {
+	throw new Error(`Pi GUI icon source is missing: ${iconSourcePath}`);
+}
+if (fs.existsSync(inheritedIconSourcePath)) {
+	throw new Error(`inherited icon source filename is still present: ${inheritedIconSourcePath}`);
+}
+const iconSource = fs.readFileSync(iconSourcePath, "utf8");
+if (!iconSource.includes("GUI wordmark") || iconSource.includes("DESK wordmark")) {
+	throw new Error("Pi GUI icon source does not contain the reviewed GUI wordmark");
+}
+
+const windowsVerification = releaseWorkflow.indexOf("Verify and stage Windows signatures");
+const macosVerification = releaseWorkflow.indexOf("Verify and stage macOS signing and notarization");
+const draftCreation = releaseWorkflow.indexOf("Create or update draft");
+if (
+	windowsVerification < 0 ||
+	macosVerification < 0 ||
+	draftCreation < 0 ||
+	windowsVerification > draftCreation ||
+	macosVerification > draftCreation
+) {
+	throw new Error("signed-release workflow must verify Windows and macOS before draft creation");
 }
 
 const releaseTag = process.env.RELEASE_TAG?.trim();

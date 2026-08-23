@@ -10,14 +10,15 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Keep Gustav MIT and DLYZZT Apache-2.0 attribution and modification notices.
 - [x] Build local Windows NSIS/MSI candidates and record exact local-only evidence.
 - [x] Add Windows clean-machine candidate and signed release-smoke workflows.
+- [x] Make the signed-release workflow verify all platform artifacts before it can create a draft.
 - [x] Refresh README, contribution, security, roadmap, package/theme, and release documentation to match the React/Tauri implementation.
 - [x] Add ignore rules and a repeatable `npm run check:publish` privacy gate.
 - [x] Keep six donor-only issue/development logs as ignored local files and remove them from the public Git index.
 - [x] Confirm the local migration prompt is ignored and never entered Git history.
 - [x] Confirm current `HEAD` history has no common key/token/private-key/credential-URL pattern hits.
 - [x] With explicit maintainer approval, rewrite all 26 post-fork commits to the public GitHub identity and noreply author/committer email without changing source trees, subjects, dates, or topology.
-- [x] Pass `npm run check:publish` across 143 tracked/non-ignored candidate files.
-- [x] Diagnose the Windows PTY timeout without changing product code: the test can send CPR before cold PowerShell emits DSR and incorrectly assumes `cmd` needs no CPR; the final serial suite passed 23 tests with one network gate ignored.
+- [x] Pass `npm run check:publish` across 144 tracked/non-ignored candidate files.
+- [x] Diagnose and harden the Windows PTY timeout: the test now waits for cold PowerShell to emit DSR before replying with CPR, covers the `cmd.exe` fallback, and the final serial suite passes 24 tests with one network gate ignored.
 
 ## Blocking before first public push
 
@@ -28,7 +29,7 @@ This file tracks Pi GUI only. Gustav's historical v1 release and issue records r
 - [x] Push only the reviewed Pi GUI history to `origin/main`; do not push `archive/electron-mvp`, use `--all`, or use `--mirror`.
 - [x] Replace placeholder repository references with the independent repository URL.
 - [x] Enable and verify GitHub private vulnerability reporting through GitHub's dedicated API.
-- [ ] Review the inherited `Pi DESK` icon/source filename against final Pi GUI branding.
+- [x] Replace the inherited `Pi DESK` wordmark/source filename with reviewable Pi GUI artwork and regenerate the platform icon set.
 
 ## Blocking before public release
 

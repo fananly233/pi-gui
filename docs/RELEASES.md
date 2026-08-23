@@ -2,7 +2,7 @@
 
 ## Current state
 
-`0.1.0` is an unpublished release candidate. The independent repository is [fananly233/pi-gui](https://github.com/fananly233/pi-gui), and the locally generated Windows installers are not signed. The Gustav project’s releases are upstream history, not Pi GUI releases.
+`0.1.0` is an unpublished release candidate. The independent repository is [fananly233/pi-gui](https://github.com/fananly233/pi-gui), and the locally generated Windows installers are not signed. No release tag or Pi GUI draft exists. The Gustav project’s releases are upstream history, not Pi GUI releases.
 
 ## Repository publication and privacy status
 
@@ -18,7 +18,9 @@ Recorded on Windows on 2026-08-23:
 - only the reviewed Pi GUI history was pushed to `origin/main`; the generated one-file remote root was replaced with an exact lease after its `fananly` MIT copyright line was retained in `LICENSE`, and its original commit remains recoverable from a local bundle;
 - GitHub private vulnerability reporting is enabled and was verified through the dedicated repository API.
 
-`npm run check:publish` now passes across 143 tracked/non-ignored candidate files. It automates the content/history/metadata/remote/attribution checks and redacts suspected values from its output.
+`npm run check:publish` now passes across 144 tracked/non-ignored candidate files. It automates the content/history/metadata/remote/attribution checks and redacts suspected values from its output.
+
+The 2026-08-23 GitHub Actions signing audit found zero repository secrets, zero repository variables, and zero environments. Real Windows and Apple identities still have to be configured outside Git. Certificate files and the runner-only Windows signing config are ignored by exact release-safety rules.
 
 ## Release identity
 
@@ -45,13 +47,24 @@ The npm, Cargo, Linux metainfo, contribution, issue, and security metadata point
 | WebView2 | `downloadBootstrapper`; installation may need network access when WebView2 is absent. |
 | Signing | A public Windows release must have valid Authenticode signatures on both NSIS and MSI assets. |
 
+## Signed-release workflow
+
+`.github/workflows/release.yml` no longer lets `tauri-action` create a draft while artifacts are still unverified. It now checks out an existing exact tag, builds into runner-local staging, verifies each platform, and creates or updates a draft only after the complete matrix succeeds.
+
+- Windows supports an eligible exportable PFX path and verifies the app executable, NSIS installer, and MSI against an exact signer subject and trusted timestamp.
+- macOS requires a Developer ID certificate plus notarization credentials and verifies `codesign`, Gatekeeper, and stapled notarization tickets.
+- Linux verifies AppImage and DEB package contents.
+- The final job requires exactly one artifact of every declared type before uploading anything to a draft.
+
+Current secrets are absent, so Windows and macOS stop before building signed artifacts and the draft job cannot run. Provider selection and setup are documented in [SIGNING.md](./SIGNING.md).
+
 ## Verification levels
 
 These are separate claims and must not be collapsed into “release verified.”
 
 1. Local build verification checks source, tests, metadata, bundle contents, and signatures. It is not clean-machine evidence.
 2. `.github/workflows/windows-clean-machine.yml` starts on a fresh GitHub-hosted Windows runner, builds the unsigned candidate there, and performs install, launch, update/reinstall, uninstall, registry cleanup, and app-data preservation checks.
-3. `.github/workflows/release-smoke.yml` downloads release assets on fresh hosted runners. Windows assets must be signed; macOS bundles must pass code-signature and Gatekeeper assessment; Linux package contents are checked.
+3. `.github/workflows/release-smoke.yml` downloads release assets on fresh hosted runners. Windows assets must match the configured signer and include trusted timestamps; macOS bundles must pass code-signature, Gatekeeper, and stapler assessment; Linux package contents are checked.
 
 For a later version, provide `previous_tag` to either Windows workflow to exercise a true cross-version NSIS upgrade. For the first `0.1.0` release, the lifecycle gate can only verify the installer’s update/reinstall path because no earlier Pi GUI identity exists.
 
@@ -64,11 +77,12 @@ Recorded on Windows on 2026-08-23:
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Release identity and tag | PASS | `check:release` accepted `v0.1.0` and matched npm, lockfile, Cargo, Tauri, HTML, and Linux metainfo. |
+| Pi GUI icon identity | PASS | The inherited `DESK` wordmark/source filename was replaced with a deterministic `GUI` pixel mark and the complete Tauri icon set was regenerated. |
 | TypeScript and renderer tests | PASS | Strict check plus 19 deterministic tests. |
 | Rust check and library tests | PASS | `cargo check --locked` passes. The real PTY test now waits until the shell emits DSR before replying with CPR, and a separate Windows test exercises the explicit `cmd.exe` fallback. The selected PowerShell path and `cmd.exe` each passed six independent test-process runs; the final serial library run passed 24 tests with one network gate ignored. The production React/xterm path was unchanged. |
 | Frontend production build | PASS | 320 modules built. |
 | Full dependency audit | PASS | Zero reported production or development dependency vulnerabilities after updating the locked Vite 7 toolchain within its existing major version. |
-| Windows bundle build | PASS WITH LINKER INFO | Rebuilt the current candidate as a 4,190,762-byte NSIS installer and a 6,021,120-byte MSI. The only Rust warning was the localized MSVC import-library linker message. |
+| Windows bundle build | PASS WITH LINKER INFO | Rebuilt the Pi GUI-branded candidate as a 4,188,902-byte NSIS installer and a 6,021,120-byte MSI. The only Rust warning was the localized MSVC import-library linker message. |
 | Generated installer metadata | PASS | `Pi GUI`, `0.1.0`, `com.pi.gui`, current-user NSIS, per-machine MSI, fixed upgrade code, and downgrade blocking were present. |
 | MSI extraction and isolated executable launch | PASS, NOT CLEAN-MACHINE | Administrative extraction contained `pi-gui.exe`; it remained alive for eight seconds with isolated app-data environment variables. No installer was run on the development machine. |
 | Windows signatures | BLOCKED | Main EXE, NSIS, and MSI all report `NotSigned`. |
@@ -76,9 +90,9 @@ Recorded on Windows on 2026-08-23:
 
 Local candidate SHA-256 values:
 
-- `pi-gui.exe` (17,406,464 bytes): `F89AB5C969A93378AB6E6E4EB55FF5116C2A5FD12E36A11B3CE297096A9F3B20`
-- `Pi GUI_0.1.0_x64-setup.exe` (4,190,762 bytes): `5B86E6FE43B0F4E232D753DD591DDFE744D3465FF7C67155A0057BDC8385BD56`
-- `Pi GUI_0.1.0_x64_en-US.msi` (6,021,120 bytes): `1E1DD4E5BC57085A6B9DEBDA9614C49F2C7446A3AE0BAB77EABCA779A65AB371`
+- `pi-gui.exe` (17,406,464 bytes): `13B01F9C21C2432818F69D7A62BFECF8543AF8929A95DDAFD2189566ECA481EF`
+- `Pi GUI_0.1.0_x64-setup.exe` (4,188,902 bytes): `4FA8AF048399FBBF235FD209DAD27D58DBF5749A264AD357A930EF4BDED41157`
+- `Pi GUI_0.1.0_x64_en-US.msi` (6,021,120 bytes): `5952758A13B941E2951BEA3D76C3640FF31179CC6C32AAC75E7BCA7E762409BE`
 
 Hosted evidence:
 
@@ -124,9 +138,10 @@ Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive
 4. Confirm the independent repository URL, derivative-work declaration, and private vulnerability-reporting setting.
 5. Push only the reviewed Pi GUI history without merging or pushing donor-only histories.
 6. Run **Windows Clean-Machine Candidate**. A cross-version upgrade result is required once a prior Pi GUI release exists.
-7. Configure Windows signing and macOS signing/notarization. The current workflow intentionally creates a draft release only.
-8. Run **Signed Release Smoke** against the draft assets.
-9. Publish only after all required jobs pass and the release notes include attribution.
+7. Configure Windows signing and macOS signing/notarization according to `docs/SIGNING.md`.
+8. Create the exact version tag. The signed-release workflow creates a draft only after local signature/notarization verification succeeds.
+9. Run **Signed Release Smoke** against the exact draft assets.
+10. Publish only after all required jobs pass and the release notes include attribution.
 
 ## Expected artifacts
 
@@ -148,4 +163,4 @@ Push only the reviewed Pi GUI branch after the gate passes. Do not push `archive
 - Cross-version upgrade result or first-release N/A justification: N/A because there is no earlier Pi GUI release with the same upgrade identity.
 - Uninstall result: PASS; executable, install directory, shortcuts, and uninstall registry key were removed.
 - App-data preservation result: PASS across update/reinstall and default uninstall.
-- Known issues: Windows and macOS signing are not configured; public installer distribution and signed release smoke remain blocked.
+- Known issues: the repository has no signing secrets or variables; Windows provider credentials and Apple Developer credentials are not configured, so draft creation, public installer distribution, and signed release smoke remain blocked.

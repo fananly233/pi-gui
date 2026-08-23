@@ -107,7 +107,7 @@ npm run gate:ecosystem-real
 npm run gate:runtime-real
 ```
 
-`gate:runtime-real` 使用隔离临时目录，不修改真实应用数据或系统 Pi。发布、签名与 clean-machine 验证流程见 [docs/RELEASES.md](./docs/RELEASES.md) 和 [RELEASE_CRITERIA.md](./RELEASE_CRITERIA.md)。
+`gate:runtime-real` 使用隔离临时目录，不修改真实应用数据或系统 Pi。发布、签名与 clean-machine 验证流程见 [docs/RELEASES.md](./docs/RELEASES.md)、[docs/SIGNING.md](./docs/SIGNING.md) 和 [RELEASE_CRITERIA.md](./RELEASE_CRITERIA.md)。
 
 ## 文档
 
@@ -116,6 +116,8 @@ npm run gate:runtime-real
 - [能力与权限边界](./docs/CAPABILITY_MODEL.md)
 - [Packages、extensions 与 resources](./docs/PACKAGES.md)
 - [发布流程](./docs/RELEASES.md)
+- [发布签名](./docs/SIGNING.md)
+- [图标维护](./docs/ICONS.md)
 - [贡献指南](./CONTRIBUTING.md)
 - [安全策略](./SECURITY.md)
 

@@ -26,6 +26,7 @@ Pi GUI is a derivative of [Gustav Pi Desktop](https://github.com/gustavonline/pi
 - [ ] Windows clean-machine install, launch, update/reinstall, uninstall, and app-data preservation pass.
 - [ ] Cross-version Windows upgrade passes, or this is the first Pi GUI release and is marked N/A.
 - [ ] Windows NSIS and MSI signatures are `Valid`.
+- [ ] Windows signer subject and trusted timestamp match the reviewed release configuration.
 - [ ] macOS signing and notarization pass.
 - [ ] Signed release smoke passes on Windows, macOS, and Linux.
 - [ ] Known issues and installation network requirements are documented.
@@ -37,6 +38,7 @@ Pi GUI is a derivative of [Gustav Pi Desktop](https://github.com/gustavonline/pi
 - Clean-machine run:
 - Signed release-smoke run:
 - Signing identities:
+- Windows timestamp authority:
 
 ## Known limitations
 

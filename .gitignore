@@ -42,6 +42,7 @@ yarn-error.log*
 *.p12
 *.pfx
 release-signing/
+src-tauri/tauri.release.windows.conf.json
 .pi/
 .codex/
 .pi-gui/

@@ -53,6 +53,8 @@ jobs:
           test -f "$APP_PATH/Contents/MacOS/pi-gui"
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           spctl --assess --type execute --verbose=2 "$APP_PATH"
+          xcrun stapler validate "$APP_PATH"
+          xcrun stapler validate "$DMG"
           hdiutil detach "$MOUNT_DIR" -quiet
 
           mkdir smoke-macos-unpacked
@@ -60,6 +62,8 @@ jobs:
           ARCHIVE_APP="$(find smoke-macos-unpacked -maxdepth 2 -name 'Pi GUI.app' -type d -print -quit)"
           test -f "$ARCHIVE_APP/Contents/MacOS/pi-gui"
           codesign --verify --deep --strict --verbose=2 "$ARCHIVE_APP"
+          spctl --assess --type execute --verbose=2 "$ARCHIVE_APP"
+          xcrun stapler validate "$ARCHIVE_APP"
 
   smoke-windows:
     name: Install, launch, update, and uninstall on Windows
@@ -100,17 +104,28 @@ jobs:
 
       - name: Require valid Windows signatures
         shell: pwsh
+        env:
+          WINDOWS_EXPECTED_SIGNER_SUBJECT: ${{ vars.WINDOWS_EXPECTED_SIGNER_SUBJECT }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_EXPECTED_SIGNER_SUBJECT)) {
+            throw "WINDOWS_EXPECTED_SIGNER_SUBJECT is not configured."
+          }
           $assets = @(Get-ChildItem smoke-assets -File)
           if (($assets | Where-Object Name -Like "*setup.exe").Count -ne 1) { throw "Expected one NSIS installer" }
           if (($assets | Where-Object Extension -EQ ".msi").Count -ne 1) { throw "Expected one MSI installer" }
           foreach ($asset in $assets) {
             $signature = Get-AuthenticodeSignature $asset.FullName
             if ($signature.Status -ne "Valid") { throw "$($asset.Name) signature is $($signature.Status), expected Valid" }
+            if ($signature.SignerCertificate.Subject -ne $env:WINDOWS_EXPECTED_SIGNER_SUBJECT) {
+              throw "$($asset.Name) signer does not match WINDOWS_EXPECTED_SIGNER_SUBJECT"
+            }
+            if (-not $signature.TimeStamperCertificate) { throw "$($asset.Name) has no trusted timestamp" }
           }
 
       - name: Verify MSI contents
         shell: pwsh
+        env:
+          WINDOWS_EXPECTED_SIGNER_SUBJECT: ${{ vars.WINDOWS_EXPECTED_SIGNER_SUBJECT }}
         run: |
           $msi = (Get-ChildItem smoke-assets -Filter "*.msi" | Select-Object -First 1).FullName
           $target = Join-Path $env:RUNNER_TEMP "pi-gui-msi-extract"
@@ -122,6 +137,10 @@ jobs:
           if (-not $executable) { throw "MSI did not contain pi-gui.exe" }
           $signature = Get-AuthenticodeSignature $executable.FullName
           if ($signature.Status -ne "Valid") { throw "MSI payload signature is $($signature.Status), expected Valid" }
+          if ($signature.SignerCertificate.Subject -ne $env:WINDOWS_EXPECTED_SIGNER_SUBJECT) {
+            throw "MSI payload signer does not match WINDOWS_EXPECTED_SIGNER_SUBJECT"
+          }
+          if (-not $signature.TimeStamperCertificate) { throw "MSI payload has no trusted timestamp" }
 
       - name: Verify NSIS lifecycle
         shell: pwsh
