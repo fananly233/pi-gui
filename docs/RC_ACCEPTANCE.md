@@ -93,13 +93,29 @@ During the final isolated rerun, runtime diagnostics pointed only to the disposa
 
 The tested runtime/source commit is `867ac378a0eaab9c55c38daecea81b1491b357d2`. [CI run 32658150459](https://github.com/fananly233/pi-gui/actions/runs/32658150459) and [Windows clean-machine run 32658152422](https://github.com/fananly233/pi-gui/actions/runs/32658152422) both passed for that exact commit.
 
-The clean-machine job passed dependency install, candidate validation, Windows bundle build, MSI administrative extraction, NSIS install, first launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation. Cross-version upgrade was skipped because no earlier Pi GUI release exists. Artifact [9498181296](https://github.com/fananly233/pi-gui/actions/runs/32658152422/artifacts/9498181296), `pi-gui-windows-unsigned-candidate`, is a 9,954,766-byte ZIP with digest `sha256:74f3c4ca878b6302f74f633c04d25dea4114291ba5a76347b5f25b7fb782104d`, retained until 2026-11-21T18:28:35Z.
+The clean-machine job passed dependency install, candidate validation, Windows bundle build, MSI administrative extraction, NSIS install, first launch, same-version update/reinstall, uninstall, shortcut and registry cleanup, and app-data preservation. Cross-version upgrade was skipped because no earlier Pi GUI release exists. Historical artifact `9498181296`, `pi-gui-windows-unsigned-candidate`, was a 9,954,766-byte ZIP with digest `sha256:74f3c4ca878b6302f74f633c04d25dea4114291ba5a76347b5f25b7fb782104d`; Phase 10C permanently deleted the ZIP while retaining the run and logs.
 
 This is unsigned lifecycle evidence, not permission to publish the installers. No tag or GitHub Release was created.
 
+## Phase 10C source-only revalidation
+
+[PR #2](https://github.com/fananly233/pi-gui/pull/2) moved the project to the source-only policy. The active merge commit is `26ca58662b33d0f8c85d5ca54a400b79557e2765`; it has the reviewed base and head as its two parents, its tree matches the reviewed PR head, and its active author/committer metadata uses the approved public GitHub noreply identity. GitHub's immutable PR record may retain a superseded platform-generated merge-object reference with non-approved author-email metadata; that object is not active `main`.
+
+[Mainline CI #19](https://github.com/fananly233/pi-gui/actions/runs/32672786127) passed on that exact merge with no artifacts. [Windows clean-machine run #7](https://github.com/fananly233/pi-gui/actions/runs/32672896200) then passed candidate validation, ephemeral NSIS/MSI build, MSI administrative extraction, and the NSIS clean-machine lifecycle. Its log reports `CLEAN_MACHINE_INSTALL_SMOKE=PASS` and `VERSION=0.1.0`; the run retained no installer artifact.
+
+The maintainer explicitly approved permanent deletion of the three historical unsigned installer artifacts. GitHub returned `204 No Content` for each deletion, and a fresh API query reports an empty artifact list for every source run:
+
+| Artifact ID | Source run | Historical SHA-256 | Result |
+| --- | --- | --- | --- |
+| `9496313691` | [`32650837760`](https://github.com/fananly233/pi-gui/actions/runs/32650837760) | `f20806ca1be04b3bb70952339ccf58dbe2b5b9602311f690ddb978dbf6eb3bd8` | Deleted; run/log retained. |
+| `9498181296` | [`32658152422`](https://github.com/fananly233/pi-gui/actions/runs/32658152422) | `74f3c4ca878b6302f74f633c04d25dea4114291ba5a76347b5f25b7fb782104d` | Deleted; run/log retained. |
+| `9499997749` | [`32665181610`](https://github.com/fananly233/pi-gui/actions/runs/32665181610) | `3fa655fa6f51ae00b24f23c2b46648f64c337e46415eabef8babd64bfda29d31` | Deleted; run/log retained. |
+
+No signing credential, tag, draft, or GitHub Release was created or accessed during this revalidation.
+
 ## Remaining source release gates
 
-- Merge the source-only policy and pass deterministic/privacy checks on the exact intended source commit.
+- Keep deterministic/privacy checks passing on the exact intended source commit.
 - Create a zero-asset draft from the exact tag and verify that only GitHub-generated source archives are present.
 - Keep Windows lifecycle runs as optional engineering evidence; do not upload their temporary installers.
 - Do not create or publish a tag/Release until the maintainer explicitly starts that separate release step.

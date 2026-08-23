@@ -27,10 +27,11 @@ This file tracks Pi GUI only. Gustav's historical releases and issue records rem
 - [x] Update README, release criteria, roadmap, changelog, security, mapping, and release documentation.
 - [x] Keep Tauri packaging and clean-machine lifecycle checks available for local/ephemeral engineering QA.
 - [x] Keep all signing credentials unconfigured and out of scope.
+- [x] Permanently delete the three historical unsigned Actions artifacts while retaining their workflow runs and logs.
 
 ## Before the first source release
 
-- [ ] Review and merge the source-only policy branch after CI passes.
+- [x] Review and merge the source-only policy branch after CI passes.
 - [ ] Run `npm run check:publish`, `npm run check:release`, deterministic tests, Rust checks/tests, frontend build, dependency audit, and `git diff --check` on the exact `main` commit.
 - [ ] Confirm release notes retain derivative attribution and clearly state that no official binaries are provided.
 - [ ] Obtain explicit maintainer approval before creating `pi-gui-v0.1.0` on the reviewed `main` commit.

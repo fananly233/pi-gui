@@ -202,6 +202,17 @@ Only these values are valid in the `Strategy` column: `KEEP_GUSTAV`, `PORT_DLYZZ
 | Signing and identity exposure | NOT APPLICABLE | No signing identity or credential is required or configured because no official binary is distributed. |
 | Publication state | NOT RUN | No tag, draft, or Release was created by the policy change. Publication remains a separate explicit maintainer action. |
 
+## Phase 10C source-only mainline closure (2026-08-23)
+
+| Check | Result | Notes |
+| --- | --- | --- |
+| PR #2 integration | PASS | Active merge `26ca58662b33d0f8c85d5ca54a400b79557e2765` has the reviewed base and source-policy head as two parents and the exact reviewed tree. Active author and committer metadata use the approved public noreply identity. |
+| Mainline CI | PASS | [CI #19](https://github.com/fananly233/pi-gui/actions/runs/32672786127) passed on the active merge and retained no artifact. |
+| Hosted lifecycle | PASS | [Windows clean-machine #7](https://github.com/fananly233/pi-gui/actions/runs/32672896200) passed candidate validation, ephemeral installer build, MSI extraction, and NSIS install/launch/update/uninstall. The run retained no artifact. |
+| Historical artifact cleanup | PASS | Artifact IDs `9496313691`, `9498181296`, and `9499997749` were permanently deleted after explicit maintainer confirmation. Fresh API queries return empty artifact lists for all three source runs; workflow logs remain available. |
+| Privacy residual | RECORDED | GitHub's immutable PR #2 record may retain a superseded platform-generated merge-object reference with non-approved author-email metadata. It is not active `main`; the active replacement preserves the reviewed tree and parents. |
+| Publication state | NOT RUN | No signing credential, tag, draft, or Release was created or accessed. |
+
 ## Migration decisions
 
 | Feature | DLYZZT source | Gustav source | Strategy | Priority | Risk | Verification |
